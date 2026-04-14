@@ -1,0 +1,1142 @@
+<!DOCTYPE html>
+<html lang="pl">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>RCM ERP</title>
+<script src="https://unpkg.com/vue@3/dist/vue.global.prod.js"></script>
+<style>
+  /* ── Reset & zmienne ────────────────────────────────────────── */
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+  :root {
+    --rcm-blue:   #1a3a5c;
+    --rcm-accent: #e8891a;
+    --rcm-green:  #2e7d32;
+    --rcm-red:    #c62828;
+    --rcm-warn:   #f57f17;
+    --bg:         #f4f6f8;
+    --card:       #ffffff;
+    --border:     #dde1e6;
+    --text:       #1a1a2e;
+    --muted:      #6b7280;
+    --radius:     8px;
+  }
+  body { font-family: system-ui, sans-serif; background: var(--bg); color: var(--text); }
+
+  /* ── Layout ─────────────────────────────────────────────────── */
+  header {
+    background: var(--rcm-blue); color: #fff;
+    padding: 12px 24px; display: flex; align-items: center; gap: 16px;
+  }
+  header h1 { font-size: 1.2rem; font-weight: 700; }
+  header .role-badge {
+    margin-left: auto; background: var(--rcm-accent);
+    padding: 4px 12px; border-radius: 20px; font-size: 0.85rem; font-weight: 600;
+  }
+  nav {
+    background: #fff; border-bottom: 1px solid var(--border);
+    display: flex; gap: 0; overflow-x: auto;
+  }
+  nav button {
+    padding: 12px 20px; border: none; background: none;
+    cursor: pointer; font-size: 0.9rem; color: var(--muted);
+    border-bottom: 3px solid transparent; transition: all 0.2s;
+    white-space: nowrap;
+  }
+  nav button.active { color: var(--rcm-blue); border-bottom-color: var(--rcm-blue); font-weight: 600; }
+  nav button:hover:not(.active) { background: var(--bg); }
+
+  main { max-width: 960px; margin: 24px auto; padding: 0 16px; }
+
+  /* ── Karty ──────────────────────────────────────────────────── */
+  .card {
+    background: var(--card); border: 1px solid var(--border);
+    border-radius: var(--radius); padding: 20px; margin-bottom: 16px;
+  }
+  .card h2 { font-size: 1rem; font-weight: 700; margin-bottom: 16px; color: var(--rcm-blue); }
+
+  /* ── Formularze ─────────────────────────────────────────────── */
+  .form-row { display: flex; gap: 12px; flex-wrap: wrap; margin-bottom: 12px; }
+  .form-group { display: flex; flex-direction: column; gap: 4px; flex: 1; min-width: 180px; }
+  label { font-size: 0.82rem; font-weight: 600; color: var(--muted); text-transform: uppercase; }
+  input, select, textarea {
+    border: 1px solid var(--border); border-radius: var(--radius);
+    padding: 8px 12px; font-size: 0.9rem; font-family: inherit;
+    transition: border-color 0.2s;
+  }
+  input:focus, select:focus, textarea:focus { outline: none; border-color: var(--rcm-blue); }
+  textarea { resize: vertical; min-height: 80px; }
+
+  /* ── Przyciski ──────────────────────────────────────────────── */
+  .btn {
+    display: inline-flex; align-items: center; gap: 6px;
+    padding: 9px 18px; border-radius: var(--radius); border: none;
+    font-size: 0.9rem; font-weight: 600; cursor: pointer; transition: opacity 0.2s;
+  }
+  .btn:hover { opacity: 0.88; }
+  .btn:disabled { opacity: 0.4; cursor: not-allowed; }
+  .btn-primary  { background: var(--rcm-blue);   color: #fff; }
+  .btn-accent   { background: var(--rcm-accent);  color: #fff; }
+  .btn-danger   { background: var(--rcm-red);     color: #fff; }
+  .btn-success  { background: var(--rcm-green);   color: #fff; }
+  .btn-outline  { background: #fff; color: var(--rcm-blue); border: 2px solid var(--rcm-blue); }
+  .btn-sm { padding: 5px 12px; font-size: 0.82rem; }
+
+  /* ── Triage Badge ───────────────────────────────────────────── */
+  .triage-result {
+    padding: 16px 20px; border-radius: var(--radius);
+    font-weight: 700; font-size: 1.05rem; margin-top: 12px;
+    display: flex; align-items: center; gap: 10px;
+  }
+  .triage-odrzut     { background: #ffebee; color: var(--rcm-red);   border: 2px solid var(--rcm-red); }
+  .triage-standard   { background: #e8f5e9; color: var(--rcm-green); border: 2px solid var(--rcm-green); }
+  .triage-niestandard { background: #fff3e0; color: var(--rcm-warn); border: 2px solid var(--rcm-warn); }
+
+  /* ── Tabela ─────────────────────────────────────────────────── */
+  table { width: 100%; border-collapse: collapse; font-size: 0.88rem; }
+  th { padding: 10px 12px; text-align: left; background: var(--bg); font-size: 0.78rem;
+       text-transform: uppercase; color: var(--muted); border-bottom: 2px solid var(--border); }
+  td { padding: 10px 12px; border-bottom: 1px solid var(--border); }
+  tr:hover td { background: #fafbfc; }
+
+  /* ── Status badge ───────────────────────────────────────────── */
+  .badge {
+    display: inline-block; padding: 2px 8px; border-radius: 12px;
+    font-size: 0.75rem; font-weight: 600;
+  }
+  .badge-draft       { background: #e0e0e0; color: #555; }
+  .badge-standard    { background: #e8f5e9; color: var(--rcm-green); }
+  .badge-niestandard { background: #fff3e0; color: var(--rcm-warn); }
+  .badge-rejected    { background: #ffebee; color: var(--rcm-red); }
+  .badge-in_production { background: #e3f2fd; color: #1565c0; }
+  .badge-done        { background: #f3e5f5; color: #6a1b9a; }
+
+  /* ── Wizard steps ───────────────────────────────────────────── */
+  .steps { display: flex; gap: 0; margin-bottom: 20px; }
+  .step {
+    flex: 1; padding: 10px; text-align: center;
+    font-size: 0.82rem; font-weight: 600; color: var(--muted);
+    border-bottom: 3px solid var(--border);
+  }
+  .step.active { color: var(--rcm-blue); border-bottom-color: var(--rcm-blue); }
+  .step.done   { color: var(--rcm-green); border-bottom-color: var(--rcm-green); }
+
+  /* ── Analytics cards ────────────────────────────────────────── */
+  .stat-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); gap: 12px; }
+  .stat-card {
+    background: var(--card); border: 1px solid var(--border);
+    border-radius: var(--radius); padding: 16px; text-align: center;
+  }
+  .stat-card .num { font-size: 2rem; font-weight: 800; color: var(--rcm-blue); }
+  .stat-card .lbl { font-size: 0.78rem; color: var(--muted); margin-top: 4px; }
+
+  /* ── Powiadomienie ──────────────────────────────────────────── */
+  .param-badge {
+    display: inline-flex; gap: 4px; align-items: center;
+    background: #fff3e0; color: var(--rcm-warn);
+    border: 1px solid var(--rcm-warn); border-radius: 12px;
+    padding: 2px 8px; font-size: 0.75rem; font-weight: 600;
+  }
+
+  /* ── SOP Builder ─────────────────────────────────────────────── */
+  .sop-blocks { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 12px; }
+  .sop-block {
+    padding: 6px 12px; background: #e3f2fd; border: 1px solid #1565c0;
+    border-radius: 20px; cursor: pointer; font-size: 0.82rem; transition: all 0.2s;
+  }
+  .sop-block:hover { background: #1565c0; color: #fff; }
+  .sop-selected {
+    display: flex; flex-direction: column; gap: 6px; margin-top: 8px;
+  }
+  .sop-item {
+    display: flex; align-items: center; gap: 8px;
+    padding: 6px 10px; background: var(--bg); border-radius: var(--radius);
+    font-size: 0.85rem;
+  }
+  .sop-item .drag-handle { cursor: grab; color: var(--muted); }
+  .sop-num { font-weight: 700; color: var(--rcm-blue); min-width: 20px; }
+</style>
+</head>
+<body>
+<div id="app">
+
+  <!-- ═══ LOGIN ════════════════════════════════════════════════════════════ -->
+  <div v-if="!currentUser" style="max-width:360px;margin:80px auto;padding:0 16px">
+    <div class="card">
+      <h2 style="text-align:center;margin-bottom:24px">🏭 RCM ERP</h2>
+      <div class="form-group" style="margin-bottom:12px">
+        <label>Rola</label>
+        <select v-model="loginRole">
+          <option value="biuro">Biuro</option>
+          <option value="technolog">Technolog</option>
+          <option value="dyrektor">Dyrektor</option>
+        </select>
+      </div>
+      <div class="form-group" style="margin-bottom:16px">
+        <label>PIN</label>
+        <input type="password" v-model="loginPin" placeholder="Wpisz PIN" @keyup.enter="login" maxlength="4">
+      </div>
+      <button class="btn btn-primary" style="width:100%" @click="login">Zaloguj</button>
+      <p v-if="loginError" style="color:var(--rcm-red);text-align:center;margin-top:8px;font-size:0.85rem">
+        Błędny PIN
+      </p>
+      <p style="text-align:center;margin-top:12px;font-size:0.75rem;color:var(--muted)">
+        Demo: Biuro=1111 · Technolog=2222 · Dyrektor=3333
+      </p>
+    </div>
+  </div>
+
+  <!-- ═══ GŁÓWNY INTERFEJS ══════════════════════════════════════════════════ -->
+  <template v-else>
+    <header>
+      <span>🏭</span>
+      <h1>RCM ERP</h1>
+      <div class="role-badge">{{ currentUser.name }}</div>
+      <button class="btn btn-sm" style="margin-left:8px;background:#fff;color:var(--rcm-blue);border:none" @click="logout">Wyloguj</button>
+    </header>
+
+    <nav>
+      <!-- Biuro widzi: Nowe zlecenie, Lista zleceń, Pytania od Technologa -->
+      <template v-if="currentUser.role === 'biuro'">
+        <button :class="{active: tab==='wizard'}"  @click="tab='wizard'">+ Nowe zlecenie</button>
+        <button :class="{active: tab==='orders'}"  @click="tab='orders';loadOrders()">Lista zleceń</button>
+        <button :class="{active: tab==='pytania'}" @click="tab='pytania';loadPytania()"
+                style="display:flex;align-items:center;gap:6px">
+          Pytania od Technologa
+          <span v-if="pendingCount > 0"
+                style="background:var(--rcm-red);color:#fff;border-radius:10px;padding:1px 7px;font-size:0.75rem;font-weight:700">
+            {{ pendingCount }}
+          </span>
+        </button>
+      </template>
+      <!-- Technolog widzi: Kolejka, Katalog SOP -->
+      <template v-if="currentUser.role === 'technolog'">
+        <button :class="{active: tab==='queue'}"      @click="tab='queue';loadOrders()">Kolejka</button>
+        <button :class="{active: tab==='templates'}"  @click="tab='templates';loadTemplates()">Katalog SOP</button>
+        <button :class="{active: tab==='orders'}"     @click="tab='orders';loadOrders()">Wszystkie zlecenia</button>
+      </template>
+      <!-- Dyrektor widzi: Dashboard, Harmonogram -->
+      <template v-if="currentUser.role === 'dyrektor'">
+        <button :class="{active: tab==='analytics'}"  @click="tab='analytics';loadAnalytics()">Dashboard</button>
+        <button :class="{active: tab==='harmonogram'}"@click="tab='harmonogram';loadHarmonogram()">Harmonogram</button>
+        <button :class="{active: tab==='orders'}"     @click="tab='orders';loadOrders()">Wszystkie zlecenia</button>
+      </template>
+    </nav>
+
+    <main>
+
+      <!-- ── WIZARD (Biuro — Nowe zlecenie) ──────────────────────────── -->
+      <div v-if="tab==='wizard'">
+        <div class="card">
+          <div class="steps">
+            <div class="step" :class="{active: wStep===1, done: wStep>1}">1. Co robimy?</div>
+            <div class="step" :class="{active: wStep===2, done: wStep>2}">2. Szczegóły</div>
+            <div class="step" :class="{active: wStep===3}">3. Triage</div>
+          </div>
+
+          <!-- STEP 1: Typ pracy -->
+          <div v-if="wStep===1">
+            <h2>Co robimy?</h2>
+            <div style="display:flex;gap:12px;flex-wrap:wrap;margin-top:16px">
+              <button class="btn btn-outline" style="flex:1;min-width:140px;padding:20px"
+                      :class="{'btn-primary': wForm.order_type==='remont'}"
+                      @click="wForm.order_type='remont';wStep=2">
+                🔧 Remont / Naprawa
+              </button>
+              <button class="btn btn-outline" style="flex:1;min-width:140px;padding:20px"
+                      :class="{'btn-primary': wForm.order_type==='catalog'}"
+                      @click="wForm.order_type='catalog';wStep=2">
+                📋 Produkt z katalogu
+              </button>
+              <button class="btn btn-outline" style="flex:1;min-width:140px;padding:20px"
+                      :class="{'btn-primary': wForm.order_type==='nowa_czesc'}"
+                      @click="wForm.order_type='nowa_czesc';wStep=2">
+                ⚙️ Nowa część / Projekt
+              </button>
+            </div>
+          </div>
+
+          <!-- STEP 2: Szczegóły — dynamiczne wg typu zlecenia -->
+          <div v-if="wStep===2">
+            <!-- Pola wspólne dla wszystkich typów -->
+            <div class="form-row">
+              <div class="form-group">
+                <label>Klient *</label>
+                <input v-model="wForm.client" placeholder="Nazwa firmy / osoby">
+              </div>
+              <div class="form-group">
+                <label>Termin (graniczny) *</label>
+                <input type="date" v-model="wForm.deadline">
+              </div>
+            </div>
+
+            <!-- ══ KATALOG: widok jak sklep internetowy ══ -->
+            <div v-if="wForm.order_type==='catalog'">
+              <div class="form-group" style="margin-bottom:12px">
+                <label>Wybierz produkt z katalogu *</label>
+                <select v-model="wForm.template_id" @change="onTemplateChange">
+                  <option :value="null" disabled>-- wybierz produkt --</option>
+                  <option v-for="t in templates" :key="t.id" :value="t.id">
+                    {{ t.name }}
+                    {{ t.base_price_pln ? '— ' + t.base_price_pln + ' zł/szt.' : '' }}
+                  </option>
+                </select>
+              </div>
+              <div class="form-row">
+                <div class="form-group">
+                  <label>Ilość (szt.) *</label>
+                  <input type="number" v-model.number="wForm.quantity" min="1" placeholder="np. 10">
+                </div>
+                <!-- Podgląd ceny na żywo -->
+                <div class="form-group" style="justify-content:center">
+                  <label>Szacowana cena netto</label>
+                  <div style="font-size:1.5rem;font-weight:800;color:var(--rcm-blue);padding:6px 0">
+                    {{ catalogPrice > 0 ? catalogPrice + ' PLN' : '—' }}
+                  </div>
+                  <span style="font-size:0.75rem;color:var(--muted)">
+                    (cena × ilość × marża)
+                  </span>
+                </div>
+              </div>
+              <div class="form-group" style="margin-bottom:12px">
+                <label>Uwagi do zamówienia</label>
+                <textarea v-model="wForm.notes" placeholder="np. specjalna długość, inna stal..."></textarea>
+              </div>
+            </div>
+
+            <!-- ══ REMONT / NOWA CZĘŚĆ: widok jak notatnik detektywa ══ -->
+            <div v-else>
+              <div class="form-group" style="margin-bottom:12px">
+                <label>Opis problemu / co klient dokładnie chce? *</label>
+                <textarea v-model="wForm.description" rows="4"
+                          placeholder="np. Pęknięte ramię koparki, grubość blachy ok. 15mm. Klient chce spawać, nie wymieniać całości."></textarea>
+              </div>
+              <div class="form-row">
+                <div class="form-group">
+                  <label>Materiał</label>
+                  <input v-model="wForm.material" placeholder="np. S355, Hardox, żeliwo">
+                </div>
+                <div class="form-group">
+                  <label>Szacowana wartość (PLN)</label>
+                  <input type="number" v-model.number="wForm.estimated_value"
+                         min="0" step="100" placeholder="np. 1500">
+                </div>
+              </div>
+
+              <!-- Checkboxy — kluczowe dla Triage -->
+              <div style="display:flex;gap:20px;flex-wrap:wrap;margin:12px 0 16px">
+                <label style="display:flex;align-items:center;gap:8px;cursor:pointer;font-size:0.9rem">
+                  <input type="checkbox" v-model="wForm.has_drawing"
+                         style="width:18px;height:18px;cursor:pointer">
+                  <span>
+                    <strong>Klient dostarczył rysunek</strong>
+                    <span style="display:block;font-size:0.78rem;color:var(--muted)">
+                      (bez rysunku → Technolog)
+                    </span>
+                  </span>
+                </label>
+                <label style="display:flex;align-items:center;gap:8px;cursor:pointer;font-size:0.9rem">
+                  <input type="checkbox" v-model="wForm.requires_visit"
+                         style="width:18px;height:18px;cursor:pointer">
+                  <span>
+                    <strong>Wymaga wizyty u klienta</strong>
+                    <span style="display:block;font-size:0.78rem;color:var(--muted)">
+                      (pomiary na miejscu)
+                    </span>
+                  </span>
+                </label>
+                <label style="display:flex;align-items:center;gap:8px;cursor:pointer;font-size:0.9rem;
+                              margin-top:8px;padding:8px;background:#fff3f3;border-radius:4px;
+                              border:1px solid #ffcdd2">
+                  <input type="checkbox" v-model="wForm.is_defence"
+                         style="width:18px;height:18px;cursor:pointer;accent-color:#c62828">
+                  <span>
+                    <strong style="color:#c62828">🛡 Projekt zbrojeniowy / MON</strong>
+                    <span style="display:block;font-size:0.78rem;color:var(--muted)">
+                      Oferty i dokumenty traktowane jako poufne
+                    </span>
+                  </span>
+                </label>
+              </div>
+
+              <!-- SOP dla remontu -->
+              <div v-if="wForm.order_type==='remont'" class="form-group" style="margin-bottom:12px">
+                <label>Rodzaj remontu (opcjonalnie)</label>
+                <select v-model="wForm.sop_name">
+                  <option value="">-- wybierz jeśli znasz typ pracy --</option>
+                  <option v-for="t in templates.filter(t=>t.category==='remont')" :value="t.name">
+                    {{ t.name }}
+                  </option>
+                </select>
+              </div>
+            </div>
+
+            <div style="display:flex;gap:8px;margin-top:16px">
+              <button class="btn btn-outline" @click="wStep=1">← Wróć</button>
+              <button class="btn btn-primary" @click="submitOrderAndTriage"
+                      :disabled="!wForm.client || !wForm.deadline || (wForm.order_type==='catalog' && !wForm.template_id)">
+                Wyślij do Triage →
+              </button>
+            </div>
+          </div>
+
+          <!-- STEP 3: Wynik Triage -->
+          <div v-if="wStep===3">
+            <h2>Wynik Triage Engine</h2>
+            <div v-if="triageResult" :class="'triage-result triage-'+triageResult.branch">
+              <span style="font-size:1.5rem">
+                {{ triageResult.branch==='odrzut' ? '🚫' : triageResult.branch==='standard' ? '✅' : '⚠️' }}
+              </span>
+              <div>
+                <div style="font-size:0.82rem;text-transform:uppercase;letter-spacing:0.05em">
+                  {{ triageResult.branch.toUpperCase() }}
+                </div>
+                <div style="font-size:0.95rem;font-weight:400;margin-top:4px">
+                  {{ triageResult.message }}
+                </div>
+              </div>
+            </div>
+
+            <!-- Ostrzeżenia (action="warn") — wyświetlane zawsze jeśli istnieją -->
+            <div v-if="triageResult?.warnings?.length"
+                 style="margin-top:12px;padding:12px 16px;background:#fff8e1;border:1px solid var(--rcm-warn);border-radius:var(--radius)">
+              <div style="font-weight:700;font-size:0.85rem;color:var(--rcm-warn);margin-bottom:6px">
+                ⚠ Ostrzeżenia (nie blokują zlecenia):
+              </div>
+              <div v-for="w in triageResult.warnings" style="font-size:0.88rem;color:#5d4037">
+                • {{ w }}
+              </div>
+            </div>
+
+            <div v-if="triageResult?.branch==='standard'" style="margin-top:16px">
+              <p style="color:var(--muted);font-size:0.88rem">
+                Wycena zostanie wygenerowana automatycznie na podstawie szablonu.
+              </p>
+              <button class="btn btn-success" style="margin-top:8px" @click="tab='orders';loadOrders()">
+                Zobacz listę zleceń
+              </button>
+            </div>
+            <div v-if="triageResult?.branch==='niestandard'" style="margin-top:16px">
+              <p style="color:var(--muted);font-size:0.88rem;margin-bottom:12px">
+                Zlecenie przekazane do kolejki Technologa.
+              </p>
+              <button class="btn btn-primary" @click="resetWizard">+ Nowe zlecenie</button>
+            </div>
+            <div v-if="triageResult?.branch==='odrzut'" style="margin-top:16px">
+              <button class="btn btn-outline" @click="resetWizard">+ Nowe zlecenie</button>
+            </div>
+          </div>
+        </div>
+      </div><!-- /wizard -->
+
+      <!-- ── LISTA ZLECEŃ ─────────────────────────────────────────────── -->
+      <div v-if="tab==='orders'">
+        <div class="card">
+          <h2>Lista zleceń</h2>
+          <table>
+            <thead>
+              <tr>
+                <th>Nr</th><th>Klient</th><th>Status</th>
+                <th>Termin</th><th>Gałąź</th><th>Akcje</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr v-for="o in orders" :key="o.id"
+                  :style="o.is_defence ? 'border-left:3px solid #c62828' : ''">
+                <td>
+                  {{ o.order_number || '#'+o.id }}
+                  <span v-if="o.is_defence" title="Projekt zbrojeniowy / MON"
+                        style="color:#c62828;font-size:0.85rem;margin-left:4px">🛡 MON</span>
+                </td>
+                <td>{{ o.client }}</td>
+                <td><span :class="'badge badge-'+o.status">{{ o.status }}</span></td>
+                <td :style="isOverdue(o.deadline) ? 'color:var(--rcm-red);font-weight:700' : ''">
+                  {{ o.deadline }}
+                </td>
+                <td>
+                  <span v-if="o.triage_branch"
+                    :class="'badge badge-'+o.triage_branch">{{ o.triage_branch }}</span>
+                  <span v-else class="badge badge-draft">brak</span>
+                </td>
+                <td style="display:flex;gap:5px;flex-wrap:wrap">
+                  <button class="btn btn-outline btn-sm" @click="openOrder(o)">Szczegóły</button>
+                  <a :href="apiBase+'/orders/'+o.id+'/oferta'" target="_blank"
+                     class="btn btn-accent btn-sm" style="text-decoration:none"
+                     title="PDF dla klienta — z ceną, bez SOP">
+                    📄 Oferta
+                  </a>
+                  <a :href="apiBase+'/orders/'+o.id+'/pdf'" target="_blank"
+                     class="btn btn-outline btn-sm" style="text-decoration:none"
+                     title="Arkusz produkcyjny — dla ceku, bez cen">
+                    🔧 Arkusz
+                  </a>
+                </td>
+              </tr>
+              <tr v-if="orders.length===0">
+                <td colspan="6" style="text-align:center;color:var(--muted);padding:24px">
+                  Brak zleceń
+                </td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      <!-- ── KOLEJKA TECHNOLOGA (Niestandard) ─────────────────────────── -->
+      <div v-if="tab==='queue'">
+        <div class="card">
+          <h2>Kolejka — Niestandard</h2>
+          <table>
+            <thead>
+              <tr><th>Nr</th><th>Klient</th><th>Termin</th><th>Pytania Biuro</th><th>Akcje</th></tr>
+            </thead>
+            <tbody>
+              <template v-for="o in nonstandardOrders" :key="o.id">
+                <tr>
+                  <td>{{ o.order_number || '#'+o.id }}</td>
+                  <td>{{ o.client }}</td>
+                  <td :style="isOverdue(o.deadline) ? 'color:var(--rcm-red);font-weight:700' : ''">
+                    {{ o.deadline }}
+                  </td>
+                  <td>
+                    <!-- Badge: ile pytań czeka na odpowiedź vs ile odpowiedziano -->
+                    <span v-if="orderParams[o.id]?.some(p => p.status==='answered')"
+                          class="badge badge-done" style="cursor:pointer"
+                          @click="toggleParams(o.id)">
+                      ✓ {{ orderParams[o.id].filter(p=>p.status==='answered').length }} odpowiedzi
+                    </span>
+                    <span v-else-if="orderParams[o.id]?.some(p => p.status==='pending')"
+                          class="param-badge">⏳ Czeka na dane</span>
+                    <span v-else style="color:var(--muted);font-size:0.82rem">—</span>
+                  </td>
+                  <td style="display:flex;gap:6px;flex-wrap:wrap">
+                    <button class="btn btn-outline btn-sm" @click="toggleParams(o.id)">
+                      {{ expandedParams===o.id ? '▲ Ukryj' : '▼ Odpowiedzi' }}
+                    </button>
+                    <button class="btn btn-accent btn-sm" @click="openZaporModal(o)">Zaporowa</button>
+                    <button class="btn btn-primary btn-sm" @click="openQuoteModal(o)">Wycena</button>
+                    <button class="btn btn-outline btn-sm" @click="openParamsModal(o)">Zapytaj ⭢</button>
+                    <a :href="apiBase+'/orders/'+o.id+'/pdf'" target="_blank"
+                       class="btn btn-success btn-sm" style="text-decoration:none">
+                      ⬇ PDF
+                    </a>
+                  </td>
+                </tr>
+                <!-- Rozwijany panel z pytaniami i odpowiedziami -->
+                <tr v-if="expandedParams===o.id">
+                  <td colspan="5" style="background:#fafbfc;padding:0">
+                    <div style="padding:12px 16px">
+                      <div v-if="!orderParams[o.id]?.length"
+                           style="color:var(--muted);font-size:0.85rem">
+                        Brak pytań dla tego zlecenia.
+                      </div>
+                      <div v-for="p in orderParams[o.id]" :key="p.id"
+                           style="border-left:3px solid var(--border);padding:8px 12px;margin-bottom:8px;border-radius:0 var(--radius) var(--radius) 0"
+                           :style="p.status==='answered' ? 'border-left-color:var(--rcm-green)' : 'border-left-color:var(--rcm-warn)'">
+                        <div style="font-size:0.78rem;color:var(--muted);margin-bottom:4px">
+                          {{ p.asked_at?.slice(0,16).replace('T',' ') }}
+                          <span :class="p.status==='answered' ? 'badge badge-done' : 'param-badge'"
+                                style="margin-left:6px">
+                            {{ p.status==='answered' ? '✓ Odpowiedziano' : '⏳ Oczekuje' }}
+                          </span>
+                        </div>
+                        <div style="font-weight:600;margin-bottom:4px">❓ {{ p.question_text }}</div>
+                        <div v-if="p.answer_text"
+                             style="background:#e8f5e9;padding:6px 10px;border-radius:var(--radius);font-size:0.88rem">
+                          💬 {{ p.answer_text }}
+                        </div>
+                        <div v-else style="color:var(--muted);font-size:0.82rem;font-style:italic">
+                          Biuro jeszcze nie odpowiedziało...
+                        </div>
+                      </div>
+                    </div>
+                  </td>
+                </tr>
+              </template>
+              <tr v-if="nonstandardOrders.length===0">
+                <td colspan="5" style="text-align:center;color:var(--muted);padding:24px">
+                  Brak zleceń w kolejce ✓
+                </td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      <!-- ── KATALOG SOP (Technolog) ───────────────────────────────────── -->
+      <div v-if="tab==='templates'">
+        <div class="card">
+          <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px">
+            <h2 style="margin-bottom:0">Katalog SOP</h2>
+            <button class="btn btn-primary btn-sm" @click="showNewTemplate=true">+ Nowy szablon</button>
+          </div>
+
+          <div v-if="showNewTemplate" style="background:var(--bg);padding:16px;border-radius:var(--radius);margin-bottom:16px">
+            <h2>Nowy szablon SOP</h2>
+            <div class="form-row">
+              <div class="form-group">
+                <label>Nazwa szablonu</label>
+                <input v-model="newTemplate.name" placeholder="np. Wymiana zęba w łyżce">
+              </div>
+              <div class="form-group">
+                <label>Kategoria</label>
+                <select v-model="newTemplate.category">
+                  <option value="remont">Remont</option>
+                  <option value="usługa">Usługa</option>
+                  <option value="zbrojenie">Zbrojenie</option>
+                  <option value="prefabrykat">Prefabrykat</option>
+                </select>
+              </div>
+              <div class="form-group">
+                <label>Cena bazowa (PLN)</label>
+                <input type="number" v-model.number="newTemplate.base_price_pln">
+              </div>
+            </div>
+
+            <!-- Konstruktor bloków SOP -->
+            <label style="font-size:0.82rem;font-weight:600;color:var(--muted);text-transform:uppercase">
+              Bloki instrukcji (klikaj aby dodać)
+            </label>
+            <div class="sop-blocks">
+              <div class="sop-block" v-for="blk in sopLibrary" @click="addSopBlock(blk)">
+                {{ blk }}
+              </div>
+            </div>
+            <div class="sop-selected" v-if="newTemplate.instruction_blocks.length">
+              <div class="sop-item" v-for="(b,i) in newTemplate.instruction_blocks" :key="i">
+                <span class="sop-num">{{ i+1 }}.</span>
+                <span style="flex:1">{{ b.text }}</span>
+                <button class="btn btn-sm" style="background:none;color:var(--rcm-red)" @click="removeSopBlock(i)">✕</button>
+              </div>
+            </div>
+
+            <div style="display:flex;gap:8px;margin-top:16px">
+              <button class="btn btn-primary" @click="saveTemplate" :disabled="!newTemplate.name">
+                Zapisz szablon
+              </button>
+              <button class="btn btn-outline" @click="showNewTemplate=false">Anuluj</button>
+            </div>
+          </div>
+
+          <table>
+            <thead><tr><th>Nazwa</th><th>Kategoria</th><th>Cena bazowa</th><th>Bloki SOP</th></tr></thead>
+            <tbody>
+              <tr v-for="t in templates" :key="t.id">
+                <td style="font-weight:600">{{ t.name }}</td>
+                <td><span class="badge badge-draft">{{ t.category }}</span></td>
+                <td>{{ t.base_price_pln ? t.base_price_pln + ' zł' : '—' }}</td>
+                <td style="color:var(--muted);font-size:0.82rem">
+                  {{ t.instruction_blocks.length }} bloków
+                </td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      <!-- ── ANALYTICS (Dyrektor) ──────────────────────────────────────── -->
+      <div v-if="tab==='analytics'">
+        <div class="stat-grid" style="margin-bottom:16px" v-if="analytics">
+          <div class="stat-card">
+            <div class="num">{{ analytics.total_orders }}</div>
+            <div class="lbl">Łącznie zleceń</div>
+          </div>
+          <div class="stat-card">
+            <div class="num" style="color:var(--rcm-red)">{{ analytics.odrzut_count }}</div>
+            <div class="lbl">Odrzuty ({{ analytics.odrzut_pct }}%)</div>
+          </div>
+          <div class="stat-card">
+            <div class="num" style="color:var(--rcm-green)">{{ analytics.standard_count }}</div>
+            <div class="lbl">Standard</div>
+          </div>
+          <div class="stat-card">
+            <div class="num" style="color:var(--rcm-warn)">{{ analytics.niestandard_count }}</div>
+            <div class="lbl">Niestandard</div>
+          </div>
+          <div class="stat-card">
+            <div class="num" style="color:#1565c0">{{ analytics.orders_in_production }}</div>
+            <div class="lbl">W produkcji</div>
+          </div>
+          <div class="stat-card">
+            <div class="num" style="color:#6a1b9a">{{ analytics.orders_done }}</div>
+            <div class="lbl">Zakończone</div>
+          </div>
+        </div>
+        <div class="card" v-if="analytics?.avg_margin_pct">
+          <h2>Średnia marża</h2>
+          <p style="font-size:2rem;font-weight:800;color:var(--rcm-blue)">
+            {{ analytics.avg_margin_pct }}%
+          </p>
+        </div>
+      </div>
+
+      <!-- ── HARMONOGRAM (Dyrektor) ────────────────────────────────────── -->
+      <div v-if="tab==='harmonogram'">
+        <div class="card">
+          <h2>Harmonogram / Lista zleceń</h2>
+          <table>
+            <thead>
+              <tr><th>Nr</th><th>Klient</th><th>Status</th><th>Termin</th><th>Gałąź</th></tr>
+            </thead>
+            <tbody>
+              <tr v-for="o in harmonogram" :key="o.id">
+                <td>{{ o.order_number || '#'+o.id }}</td>
+                <td>{{ o.client }}</td>
+                <td><span :class="'badge badge-'+(o.status||'draft')">{{ o.status }}</span></td>
+                <td :style="isOverdue(o.deadline) ? 'color:var(--rcm-red);font-weight:700' : ''">
+                  {{ o.deadline }}
+                </td>
+                <td>
+                  <span v-if="o.branch" :class="'badge badge-'+o.branch">{{ o.branch }}</span>
+                </td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      <!-- ── PYTANIA OD TECHNOLOGA (Biuro) ─────────────────────────────── -->
+      <div v-if="tab==='pytania'">
+        <div class="card">
+          <h2>Pytania od Technologa</h2>
+          <p v-if="pytania.length===0" style="color:var(--muted);padding:16px 0">
+            Brak oczekujących pytań ✓
+          </p>
+          <div v-for="p in pytania" :key="p.id"
+               style="border:1px solid var(--border);border-radius:var(--radius);padding:16px;margin-bottom:12px">
+            <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:8px">
+              <div style="flex:1">
+                <div style="font-size:0.78rem;color:var(--muted);margin-bottom:4px">
+                  Zlecenie #{{ p.order_id }} · {{ p.asked_at?.slice(0,16).replace('T',' ') }}
+                  <span :class="p.status==='pending' ? 'param-badge' : 'badge badge-done'"
+                        style="margin-left:8px">
+                    {{ p.status === 'pending' ? '⏳ Czeka na odpowiedź' : '✓ Odpowiedziano' }}
+                  </span>
+                </div>
+                <div style="font-weight:600;margin-bottom:8px">{{ p.question_text }}</div>
+
+                <!-- Jeśli już odpowiedziano — pokaż odpowiedź -->
+                <div v-if="p.status==='answered'"
+                     style="background:#e8f5e9;padding:8px 12px;border-radius:var(--radius);font-size:0.88rem">
+                  <strong>Twoja odpowiedź:</strong> {{ p.answer_text }}
+                </div>
+
+                <!-- Formularz odpowiedzi (tylko pending) -->
+                <div v-if="p.status==='pending'" style="display:flex;gap:8px;margin-top:8px">
+                  <input v-model="answerDraft[p.id]"
+                         placeholder="Wpisz odpowiedź..."
+                         style="flex:1;padding:8px 12px;border:1px solid var(--border);border-radius:var(--radius)"
+                         @keyup.enter="submitAnswer(p.id)">
+                  <button class="btn btn-success btn-sm"
+                          @click="submitAnswer(p.id)"
+                          :disabled="!answerDraft[p.id]">
+                    Wyślij
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+    </main><!-- /main -->
+
+    <!-- ═══ MODAL: Wycena ręczna ══════════════════════════════════════════ -->
+    <div v-if="quoteModal.show" style="position:fixed;inset:0;background:rgba(0,0,0,.5);display:flex;align-items:center;justify-content:center;z-index:100">
+      <div class="card" style="width:440px;max-height:90vh;overflow-y:auto">
+        <h2>Wycena ręczna — {{ quoteModal.order?.client }}</h2>
+        <div class="form-row">
+          <div class="form-group">
+            <label>Robocizna (godz.)</label>
+            <input type="number" v-model.number="quoteModal.labor_hours" min="0" step="0.5">
+          </div>
+          <div class="form-group">
+            <label>Materiał (PLN)</label>
+            <input type="number" v-model.number="quoteModal.material_cost" min="0">
+          </div>
+        </div>
+        <div class="form-row">
+          <div class="form-group">
+            <label>Narzut overhead (%)</label>
+            <input type="number" v-model.number="quoteModal.overhead_pct" min="0" max="1" step="0.05">
+          </div>
+          <div class="form-group">
+            <label>Marża (%)</label>
+            <input type="number" v-model.number="quoteModal.margin_pct" min="0" max="2" step="0.05">
+          </div>
+        </div>
+        <div style="background:var(--bg);padding:12px;border-radius:var(--radius);margin:12px 0;font-weight:700">
+          Szacowana cena netto:
+          <span style="color:var(--rcm-blue);font-size:1.2rem">
+            {{ calcQuote() }} PLN
+          </span>
+        </div>
+        <div style="display:flex;gap:8px">
+          <button class="btn btn-success" @click="submitQuote">Zatwierdź wycenę</button>
+          <button class="btn btn-outline" @click="quoteModal.show=false">Anuluj</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- ═══ MODAL: Zaporowa marża ═════════════════════════════════════════ -->
+    <div v-if="zaporModal.show" style="position:fixed;inset:0;background:rgba(0,0,0,.5);display:flex;align-items:center;justify-content:center;z-index:100">
+      <div class="card" style="width:400px">
+        <h2>⚡ Zaporowa marża</h2>
+        <p style="color:var(--muted);margin-bottom:16px;font-size:0.9rem">
+          System nałoży mnożnik ×3–4.5 na koszt materiału × szacowane godziny.
+          Klient albo zapłaci, albo odpadnie — obie opcje są dobre.
+        </p>
+        <div class="form-row">
+          <div class="form-group">
+            <label>Szacowany koszt materiału (PLN)</label>
+            <input type="number" v-model.number="zaporModal.material_cost" min="0">
+          </div>
+          <div class="form-group">
+            <label>Szacowane godziny pracy</label>
+            <input type="number" v-model.number="zaporModal.hours_estimate" min="0" step="0.5">
+          </div>
+        </div>
+        <div style="display:flex;gap:8px;margin-top:8px">
+          <button class="btn btn-danger" @click="submitZapor">Zastosuj zaporową</button>
+          <button class="btn btn-outline" @click="zaporModal.show=false">Anuluj</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- ═══ MODAL: Zapytaj o parametry ════════════════════════════════════ -->
+    <div v-if="paramsModal.show" style="position:fixed;inset:0;background:rgba(0,0,0,.5);display:flex;align-items:center;justify-content:center;z-index:100">
+      <div class="card" style="width:440px">
+        <h2>Zapytaj Biuro o parametry</h2>
+        <p style="color:var(--muted);margin-bottom:16px;font-size:0.9rem">
+          Biuro dostanie powiadomienie i uzupełni dane bez telefonu.
+        </p>
+        <div class="sop-blocks">
+          <div class="sop-block" v-for="q in paramQuestions"
+               @click="paramsModal.question = q">
+            {{ q }}
+          </div>
+        </div>
+        <div class="form-group" style="margin-top:12px">
+          <label>Pytanie do Biuro</label>
+          <textarea v-model="paramsModal.question" placeholder="lub wpisz własne pytanie..."></textarea>
+        </div>
+        <div style="display:flex;gap:8px;margin-top:8px">
+          <button class="btn btn-primary" @click="submitParamRequest"
+                  :disabled="!paramsModal.question">Wyślij pytanie</button>
+          <button class="btn btn-outline" @click="paramsModal.show=false">Anuluj</button>
+        </div>
+      </div>
+    </div>
+
+  </template><!-- /loggedIn -->
+</div><!-- /app -->
+
+<script>
+const { createApp, ref, computed, onMounted } = Vue
+
+// ── Adres backendu — zmień jeśli inny IP ──────────────────────────────────
+const API = "http://localhost:8000/api"
+
+// ── Domyślne PINy (MVP) ──────────────────────────────────────────────────
+const USERS = [
+  { id: 1, name: "Biuro",     role: "biuro",     pin: "1111" },
+  { id: 2, name: "Technolog", role: "technolog",  pin: "2222" },
+  { id: 3, name: "Dyrektor",  role: "dyrektor",   pin: "3333" },
+]
+
+// ── Biblioteka bloków SOP (można rozszerzyć) ─────────────────────────────
+const SOP_LIBRARY = [
+  // Przygotowanie
+  "Oczyścić powierzchnię z rdzy i zanieczyszczeń",
+  "Ocenić zakres uszkodzeń i udokumentować",
+  "Pobrać materiał wg. listy materiałowej",
+  // Cięcie
+  "Wyciąć uszkodzone elementy (PIŁA / PLAZMA)",
+  "Ciąć pręty na wymiar wg. rysunku",
+  "Wykonać cięcie CNC wg. pliku DXF",
+  // Gięcie
+  "Giąć strzemiona wg. wymiarów (a, b, c)",
+  "Giąć elementy na giętarce CNC",
+  // Spawanie
+  "Wspawać nowy element wg. pozycji fabrycznej (MIG)",
+  "Wspawać wstawki — pełny przetop",
+  "Zeszlifować spoiny do gładkości (SM)",
+  // Montaż
+  "Montować kosz zbrojeniowy na stole montażowym",
+  "Wiązać węzły drutem wiązałkowym co 200mm",
+  "Zmontować elementy śrubowe i osie",
+  // Kontrola
+  "Sprawdzić wymiary pierwszej sztuki kontrolnej",
+  "Sprawdzić wymiary liniowe wg. rysunku",
+  "Sprawdzić wymiary geometryczne",
+  "Sprawdzenie wymogów powierzchni",
+  // Wykończenie
+  "Nałożyć powłokę antykorozyjną",
+  "Skompletować elementy wg. listy zbiorczej",
+  "Oznaczyć pojemnik numerem zlecenia",
+]
+
+// ── Szablonowe pytania do Biuro ──────────────────────────────────────────
+const PARAM_QUESTIONS = [
+  "Proszę podać markę stali (np. S235, S355, Hardox)",
+  "Proszę podać grubość ścianki / blachy (mm)",
+  "Proszę potwierdzić wymiary zewnętrzne (dł × szer × wys)",
+  "Czy klient dostarczy rysunek / rysunek CAD?",
+  "Jaka jest wymagana klasa spawania?",
+]
+
+createApp({
+  setup() {
+    const currentUser = ref(null)
+    const loginRole   = ref("biuro")
+    const loginPin    = ref("")
+    const loginError  = ref(false)
+    const tab         = ref("wizard")
+
+    const orders      = ref([])
+    const templates   = ref([])
+    const analytics   = ref(null)
+    const harmonogram = ref([])
+    const triageResult = ref(null)
+    const pytania      = ref([])       // pytania Technologa → Biuro
+    const answerDraft  = ref({})       // {param_id: "tekst odpowiedzi"}
+    const pendingCount = ref(0)        // licznik dla badge w nav
+    const orderParams  = ref({})       // {order_id: [ParameterRequest, ...]}
+    const expandedParams = ref(null)   // ID zlecenia z otwartym panelem
+
+    // Wizard form
+    const wStep = ref(1)
+    const wForm = ref({
+      client: "", deadline: "", material: "", has_drawing: false,
+      order_type: "", sop_name: "", purpose: "", notes: "", estimated_value: 0,
+      description: "",       // opis problemu (remont/nowa_czesc)
+      requires_visit: false, // wymaga wizyty u klienta
+      is_defence: false,     // projekt zbrojeniowy / MON
+      template_id: null,     // wybrany produkt z katalogu
+      quantity: 1,           // ilość sztuk (katalog)
+    })
+
+    // Modals
+    const quoteModal = ref({ show:false, order:null, labor_hours:1, material_cost:0, overhead_pct:0.1, margin_pct:0.25 })
+    const zaporModal = ref({ show:false, order:null, material_cost:0, hours_estimate:1 })
+    const paramsModal = ref({ show:false, order:null, question:"" })
+
+    // Template builder
+    const showNewTemplate = ref(false)
+    const newTemplate = ref({ name:"", category:"remont", base_price_pln:null, instruction_blocks:[] })
+
+    const sopLibrary    = SOP_LIBRARY
+    const paramQuestions = PARAM_QUESTIONS
+
+    // ── Auth ─────────────────────────────────────────────────────────────
+    function login() {
+      const user = USERS.find(u => u.role === loginRole.value && u.pin === loginPin.value)
+      if (user) {
+        currentUser.value = user
+        loginError.value  = false
+        // Otwórz domyślną zakładkę dla roli
+        tab.value = { biuro: "wizard", technolog: "queue", dyrektor: "analytics" }[user.role]
+        if (tab.value !== "wizard") loadOrders()
+        if (tab.value === "analytics") loadAnalytics()
+      } else {
+        loginError.value = true
+      }
+    }
+    function logout() { currentUser.value = null; loginPin.value = ""; resetWizard() }
+
+    function resetWizard() {
+      wStep.value = 1
+      triageResult.value = null
+      wForm.value = {
+        client: "", deadline: "", material: "", has_drawing: false,
+        order_type: "", sop_name: "", purpose: "", notes: "", estimated_value: 0,
+        description: "", requires_visit: false, is_defence: false, template_id: null, quantity: 1,
+      }
+    }
+
+    // ── API helpers ───────────────────────────────────────────────────────
+    async function api(path, opts={}) {
+      const res = await fetch(API + path, {
+        headers: { "Content-Type": "application/json" },
+        ...opts,
+        body: opts.body ? JSON.stringify(opts.body) : undefined
+      })
+      if (!res.ok) { const e = await res.json(); throw new Error(e.detail || "API error") }
+      return res.json()
+    }
+
+    // ── Loader ────────────────────────────────────────────────────────────
+    async function loadOrders() {
+      orders.value = await api("/orders")
+    }
+
+    async function loadPytania() {
+      pytania.value = await api("/params")
+      pendingCount.value = pytania.value.filter(p => p.status === "pending").length
+    }
+
+    async function submitAnswer(paramId) {
+      const text = answerDraft.value[paramId]
+      if (!text) return
+      await api(`/params/${paramId}/answer`, { method:"PATCH", body:{ answer_text: text } })
+      answerDraft.value[paramId] = ""
+      await loadPytania()  // odśwież listę i badge
+    }
+    async function loadTemplates() {
+      templates.value = await api("/templates")
+    }
+    async function loadAnalytics() {
+      analytics.value = await api("/analytics")
+    }
+    async function loadHarmonogram() {
+      harmonogram.value = await api("/harmonogram")
+    }
+
+    // ── Wizard submit ─────────────────────────────────────────────────────
+    async function submitOrderAndTriage() {
+      // 1. Stwórz zlecenie
+      const order = await api("/orders", { method:"POST", body: wForm.value })
+      // 2. Uruchom Triage Engine
+      const result = await api(`/orders/${order.id}/triage`, { method:"POST" })
+      triageResult.value = result
+      wStep.value = 3
+    }
+
+    // ── Oblicz podgląd wyceny ─────────────────────────────────────────────
+    function calcQuote() {
+      const m = quoteModal.value
+      const labor = m.labor_hours * 90  // 90 zł/h
+      const sub   = (m.material_cost + labor) * (1 + m.overhead_pct)
+      return Math.round(sub * (1 + m.margin_pct))
+    }
+
+    // ── Modal handlers ────────────────────────────────────────────────────
+    function openOrder(o) {
+      // TODO: Otworzyć modal szczegółów zlecenia
+      alert(`Zlecenie #${o.order_number || o.id}\nKlient: ${o.client}\nStatus: ${o.status}`)
+    }
+    function openQuoteModal(o) {
+      quoteModal.value = { show:true, order:o, labor_hours:1, material_cost:0, overhead_pct:0.1, margin_pct:0.25 }
+    }
+    function openZaporModal(o) {
+      zaporModal.value = { show:true, order:o, material_cost:0, hours_estimate:1 }
+    }
+    function openParamsModal(o) {
+      paramsModal.value = { show:true, order:o, question:"" }
+    }
+
+    async function submitQuote() {
+      const m = quoteModal.value
+      await api(`/orders/${m.order.id}/quote`, {
+        method: "POST",
+        body: {
+          labor_hours: m.labor_hours, material_cost: m.material_cost,
+          overhead_pct: m.overhead_pct, margin_pct: m.margin_pct
+        }
+      })
+      quoteModal.value.show = false
+      alert("✅ Wycena zapisana!")
+    }
+
+    async function submitZapor() {
+      const m = zaporModal.value
+      const q = await api(`/orders/${m.order.id}/quote/zapor`, {
+        method: "POST",
+        body: { material_cost: m.material_cost, hours_estimate: m.hours_estimate }
+      })
+      zaporModal.value.show = false
+      alert(`⚡ Zaporowa cena: ${q.total_net} PLN`)
+    }
+
+    async function submitParamRequest() {
+      const m = paramsModal.value
+      await api(`/orders/${m.order.id}/params`, {
+        method: "POST",
+        body: { question_text: m.question }
+      })
+      paramsModal.value.show = false
+      // Odśwież panel odpowiedzi dla tego zlecenia
+      await toggleParams(m.order.id)
+      alert("✅ Pytanie wysłane do Biuro!")
+    }
+
+    async function toggleParams(orderId) {
+      if (expandedParams.value === orderId) {
+        expandedParams.value = null  // zwiń jeśli już otwarty
+        return
+      }
+      // Pobierz pytania dla tego zlecenia z API
+      orderParams.value[orderId] = await api(`/orders/${orderId}/params`)
+      expandedParams.value = orderId
+    }
+
+    // ── Template builder ──────────────────────────────────────────────────
+    function addSopBlock(text) {
+      const blks = newTemplate.value.instruction_blocks
+      blks.push({ order: blks.length + 1, text })
+    }
+    function removeSopBlock(i) {
+      newTemplate.value.instruction_blocks.splice(i, 1)
+    }
+    async function saveTemplate() {
+      await api("/templates", { method:"POST", body: newTemplate.value })
+      showNewTemplate.value = false
+      newTemplate.value = { name:"", category:"remont", base_price_pln:null, instruction_blocks:[] }
+      loadTemplates()
+    }
+
+    // ── Computed ──────────────────────────────────────────────────────────
+    const nonstandardOrders = computed(() =>
+      orders.value.filter(o => o.triage_branch === "niestandard")
+    )
+
+    // Podgląd ceny katalogu na żywo: cena_bazowa × ilość × (1 + marża)
+    const catalogPrice = computed(() => {
+      if (!wForm.value.template_id || !wForm.value.quantity) return 0
+      const tmpl = templates.value.find(t => t.id === wForm.value.template_id)
+      if (!tmpl || !tmpl.base_price_pln) return 0
+      return Math.round(tmpl.base_price_pln * wForm.value.quantity * (1 + tmpl.margin_pct))
+    })
+
+    // Po wyborze szablonu — zaktualizuj estimated_value dla reguły Triage (min. marży)
+    function onTemplateChange() {
+      wForm.value.estimated_value = catalogPrice.value
+    }
+
+    // ── Utils ─────────────────────────────────────────────────────────────
+    function isOverdue(deadline) {
+      return deadline && deadline < new Date().toISOString().slice(0,10)
+    }
+
+    // Załaduj szablony przy starcie + licznik pytań dla Biuro
+    onMounted(async () => {
+      await loadTemplates()
+      // Odśwież badge co 30s (prosty polling zamiast WebSocket dla MVP)
+      loadPytania()
+      setInterval(loadPytania, 30000)
+    })
+
+    return {
+      apiBase: API,
+      currentUser, loginRole, loginPin, loginError,
+      tab, orders, templates, analytics, harmonogram, triageResult,
+      wStep, wForm,
+      quoteModal, zaporModal, paramsModal,
+      showNewTemplate, newTemplate,
+      sopLibrary, paramQuestions,
+      nonstandardOrders, catalogPrice, onTemplateChange,
+      login, logout, resetWizard,
+      pytania, answerDraft, pendingCount, orderParams, expandedParams,
+      loadOrders, loadTemplates, loadAnalytics, loadHarmonogram, loadPytania, submitAnswer,
+      toggleParams,
+      submitOrderAndTriage, calcQuote,
+      openOrder, openQuoteModal, openZaporModal, openParamsModal,
+      submitQuote, submitZapor, submitParamRequest,
+      addSopBlock, removeSopBlock, saveTemplate,
+      isOverdue,
+    }
+  }
+}).mount("#app")
+</script>
+</body>
+</html>

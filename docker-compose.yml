@@ -1,0 +1,15 @@
+services:
+  rcm-erp:
+    build: .
+    ports:
+      - "8000:8000"
+    volumes:
+      - ./data:/app/data     # persystencja bazy SQLite
+    environment:
+      - DATABASE_URL=sqlite:////app/data/rcm_erp.db
+    restart: unless-stopped
+
+# Uruchomienie:
+#   docker compose up -d
+# Dostęp z sieci biura:
+#   http://192.168.1.15:8000

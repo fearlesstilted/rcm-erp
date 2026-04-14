@@ -1,0 +1,314 @@
+<!DOCTYPE html>
+<html lang="pl">
+<head>
+<meta charset="UTF-8">
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    font-family: Arial, sans-serif;
+    font-size: 10pt;
+    color: #111;
+    padding: 16mm 14mm;
+  }
+
+  /* ── Nagłówek ─────────────────────────────────────────────── */
+  .header {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    border-bottom: 3px solid #1a3a5c;
+    padding-bottom: 10px;
+    margin-bottom: 16px;
+  }
+  .company-name {
+    font-size: 18pt;
+    font-weight: 900;
+    color: #1a3a5c;
+  }
+  .company-sub {
+    font-size: 8pt;
+    color: #666;
+    margin-top: 3px;
+    line-height: 1.6;
+  }
+  .doc-title { text-align: right; }
+  .doc-title h1 {
+    font-size: 14pt;
+    font-weight: 700;
+    color: #1a3a5c;
+  }
+  .doc-title .nr {
+    font-size: 11pt;
+    font-weight: 700;
+    color: #e8891a;
+    margin-top: 4px;
+  }
+  .doc-title .date {
+    font-size: 8pt;
+    color: #666;
+    margin-top: 2px;
+  }
+
+  /* ── Dane klienta ─────────────────────────────────────────── */
+  .client-box {
+    background: #f4f6f8;
+    border-left: 4px solid #1a3a5c;
+    padding: 10px 14px;
+    margin-bottom: 16px;
+  }
+  .client-box .label {
+    font-size: 7.5pt;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    color: #666;
+    margin-bottom: 4px;
+  }
+  .client-box .name {
+    font-size: 13pt;
+    font-weight: 700;
+    color: #1a3a5c;
+  }
+  .client-box .deadline {
+    margin-top: 6px;
+    font-size: 9pt;
+    color: #444;
+  }
+
+  /* ── Przedmiot oferty ─────────────────────────────────────── */
+  .offer-table {
+    width: 100%;
+    border-collapse: collapse;
+    margin-bottom: 16px;
+  }
+  .offer-table th {
+    background: #1a3a5c;
+    color: #fff;
+    font-size: 8.5pt;
+    font-weight: 700;
+    padding: 6px 10px;
+    text-align: left;
+  }
+  .offer-table td {
+    padding: 8px 10px;
+    border: 1px solid #dde1e6;
+    font-size: 10pt;
+  }
+  .offer-table tr:nth-child(even) td { background: #f9fafb; }
+  .offer-table .qty { text-align: center; width: 60px; }
+  .offer-table .price { text-align: right; width: 100px; font-weight: 700; }
+
+  /* ── Podsumowanie ceny ────────────────────────────────────── */
+  .price-summary {
+    display: flex;
+    justify-content: flex-end;
+    margin-bottom: 20px;
+  }
+  .price-box {
+    border: 2px solid #1a3a5c;
+    border-radius: 4px;
+    overflow: hidden;
+    min-width: 260px;
+  }
+  .price-row {
+    display: flex;
+    justify-content: space-between;
+    padding: 6px 14px;
+    font-size: 9pt;
+    border-bottom: 1px solid #dde1e6;
+  }
+  .price-row:last-child { border-bottom: none; }
+  .price-row.total {
+    background: #1a3a5c;
+    color: #fff;
+    font-size: 13pt;
+    font-weight: 900;
+    padding: 10px 14px;
+  }
+  .price-row.total .val { color: #e8891a; }
+
+  /* ── Warunki oferty ───────────────────────────────────────── */
+  .terms {
+    background: #fffde7;
+    border: 1px solid #f9a825;
+    border-radius: 4px;
+    padding: 10px 14px;
+    font-size: 8.5pt;
+    color: #444;
+    margin-bottom: 20px;
+    line-height: 1.7;
+  }
+  .terms strong { color: #e65100; }
+
+  /* ── Stopka / podpis ──────────────────────────────────────── */
+  .signatures {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 20px;
+    margin-top: 24px;
+  }
+  .signature-box {
+    border-top: 1px solid #111;
+    padding-top: 4px;
+    font-size: 8pt;
+    color: #555;
+    text-align: center;
+  }
+  .footer {
+    border-top: 1px solid #dde1e6;
+    margin-top: 16px;
+    padding-top: 6px;
+    font-size: 7.5pt;
+    color: #999;
+    display: flex;
+    justify-content: space-between;
+  }
+
+  @media print { body { padding: 10mm; } }
+</style>
+</head>
+<body>
+
+<!-- ═══ NAGŁÓWEK ═══════════════════════════════════════════════ -->
+<div class="header">
+  <div>
+    <div class="company-name">RCM Sp. z o.o.</div>
+    <div class="company-sub">
+      ul. Graniczna 3, 19-500 Gołdap<br>
+      NIP: 847-000-00-00 &nbsp;|&nbsp; REGON: 000000000
+    </div>
+  </div>
+  <div class="doc-title">
+    <h1>Oferta Handlowa</h1>
+    <div class="nr">Nr: OF/{{ order.order_number or order.id }}/{{ today[-4:] }}</div>
+    <div class="date">Data: {{ today }}</div>
+  </div>
+</div>
+
+<!-- ═══ DANE KLIENTA ════════════════════════════════════════════ -->
+<div class="client-box">
+  <div class="label">Oferta dla:</div>
+  <div class="name">{{ order.client }}</div>
+  {% if order.deadline %}
+  <div class="deadline">Planowany termin realizacji: <strong>{{ order.deadline }}</strong></div>
+  {% endif %}
+  {% if order.is_defence %}
+  <div style="margin-top:6px;color:#c62828;font-weight:700;font-size:9pt">
+    Projekt zbrojeniowy / MON
+  </div>
+  {% endif %}
+</div>
+
+<!-- ═══ PRZEDMIOT OFERTY ════════════════════════════════════════ -->
+<table class="offer-table">
+  <thead>
+    <tr>
+      <th>#</th>
+      <th>Przedmiot / Usługa</th>
+      <th class="qty">Ilość</th>
+      <th class="price">Cena netto</th>
+    </tr>
+  </thead>
+  <tbody>
+    {% if quote %}
+    <tr>
+      <td style="text-align:center">1</td>
+      <td>
+        {% if sop_template %}
+          {{ sop_template.name }}
+        {% elif order.sop_name %}
+          {{ order.sop_name }}
+        {% elif order.order_type == 'nowa_czesc' %}
+          Projekt indywidualny / Nowa część
+        {% else %}
+          Usługa według specyfikacji
+        {% endif %}
+        {% if order.description %}
+          <br><span style="font-size:8pt;color:#666">{{ order.description }}</span>
+        {% endif %}
+      </td>
+      <td class="qty">{{ order.quantity or 1 }} szt.</td>
+      <td class="price">{{ quote.total_net }} PLN</td>
+    </tr>
+    {% else %}
+    {# Brak formalnej wyceny — katalog z auto-ceną #}
+    <tr>
+      <td style="text-align:center">1</td>
+      <td>
+        {% if sop_template %}{{ sop_template.name }}{% else %}{{ order.sop_name or 'Usługa' }}{% endif %}
+      </td>
+      <td class="qty">{{ order.quantity or 1 }} szt.</td>
+      <td class="price">
+        {% if sop_template and sop_template.base_price_pln %}
+          {{ ((sop_template.base_price_pln | float) * (1 + (sop_template.margin_pct | float)) * (order.quantity or 1)) | round(2) }} PLN
+        {% else %}
+          Do ustalenia
+        {% endif %}
+      </td>
+    </tr>
+    {% endif %}
+  </tbody>
+</table>
+
+<!-- ═══ PODSUMOWANIE CENY ═══════════════════════════════════════ -->
+<div class="price-summary">
+  <div class="price-box">
+    {% if quote %}
+    <div class="price-row">
+      <span>Wartość netto:</span>
+      <span>{{ quote.total_net }} PLN</span>
+    </div>
+    <div class="price-row">
+      <span>VAT (23%):</span>
+      <span>{{ ((quote.total_net | float) * 0.23) | round(2) }} PLN</span>
+    </div>
+    <div class="price-row total">
+      <span>RAZEM BRUTTO:</span>
+      <span class="val">{{ ((quote.total_net | float) * 1.23) | round(2) }} PLN</span>
+    </div>
+    {% elif sop_template and sop_template.base_price_pln %}
+    {% set netto = ((sop_template.base_price_pln | float) * (1 + (sop_template.margin_pct | float)) * (order.quantity or 1)) | round(2) %}
+    <div class="price-row">
+      <span>Wartość netto:</span>
+      <span>{{ netto }} PLN</span>
+    </div>
+    <div class="price-row">
+      <span>VAT (23%):</span>
+      <span>{{ (netto * 0.23) | round(2) }} PLN</span>
+    </div>
+    <div class="price-row total">
+      <span>RAZEM BRUTTO:</span>
+      <span class="val">{{ (netto * 1.23) | round(2) }} PLN</span>
+    </div>
+    {% else %}
+    <div class="price-row total">
+      <span>Cena:</span>
+      <span class="val">Wycena indywidualna</span>
+    </div>
+    {% endif %}
+  </div>
+</div>
+
+<!-- ═══ WARUNKI OFERTY ══════════════════════════════════════════ -->
+<div class="terms">
+  <strong>Warunki:</strong>
+  Oferta ważna <strong>14 dni</strong> od daty wystawienia.
+  Ceny netto, do których należy doliczyć podatek VAT 23%.
+  Realizacja po wpłacie zaliczki 50% lub po podpisaniu umowy.
+  Płatność przelewem — 14 dni od FV.
+  W cenie nie zawarto kosztów transportu — wycena osobno.
+</div>
+
+<!-- ═══ PODPISY ═════════════════════════════════════════════════ -->
+<div class="signatures">
+  <div class="signature-box">Wystawił (Biuro RCM)<br><br>___________________<br>Data: {{ today }}</div>
+  <div class="signature-box">Przyjął (Klient)<br><br>___________________<br>Data: ____________</div>
+</div>
+
+<!-- ═══ STOPKA ══════════════════════════════════════════════════ -->
+<div class="footer">
+  <span>RCM Sp. z o.o. | ul. Graniczna 3, 19-500 Gołdap | NIP: 847-000-00-00</span>
+  <span>OF/{{ order.order_number or order.id }}/{{ today[-4:] }}</span>
+</div>
+
+</body>
+</html>

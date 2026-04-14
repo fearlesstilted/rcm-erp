@@ -1,0 +1,378 @@
+<!DOCTYPE html>
+<html lang="pl">
+<head>
+<meta charset="UTF-8">
+<style>
+  /* ── Reset + zmienne ─────────────────────────────────────── */
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    font-family: Arial, sans-serif;
+    font-size: 10pt;
+    color: #111;
+    padding: 16mm 14mm;
+  }
+
+  /* ── Nagłówek ────────────────────────────────────────────── */
+  .header {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    border-bottom: 3px solid #1a3a5c;
+    padding-bottom: 8px;
+    margin-bottom: 14px;
+  }
+  .company-name {
+    font-size: 18pt;
+    font-weight: 900;
+    color: #1a3a5c;
+    letter-spacing: -0.5px;
+  }
+  .company-sub {
+    font-size: 8pt;
+    color: #666;
+    margin-top: 2px;
+  }
+  .doc-title {
+    text-align: right;
+  }
+  .doc-title h1 {
+    font-size: 14pt;
+    font-weight: 700;
+    color: #1a3a5c;
+  }
+  .doc-title .nr {
+    font-size: 11pt;
+    font-weight: 700;
+    color: #e8891a;
+    margin-top: 4px;
+  }
+  .doc-title .date {
+    font-size: 8pt;
+    color: #666;
+    margin-top: 2px;
+  }
+
+  /* ── Sekcje ──────────────────────────────────────────────── */
+  .section {
+    margin-bottom: 12px;
+    page-break-inside: avoid;
+  }
+  .section-title {
+    background: #1a3a5c;
+    color: #fff;
+    font-size: 9pt;
+    font-weight: 700;
+    padding: 4px 8px;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    margin-bottom: 6px;
+  }
+
+  /* ── Tabela danych ────────────────────────────────────────── */
+  .info-table {
+    width: 100%;
+    border-collapse: collapse;
+  }
+  .info-table td {
+    padding: 4px 8px;
+    border: 1px solid #dde1e6;
+    vertical-align: top;
+  }
+  .info-table td.label {
+    background: #f4f6f8;
+    font-weight: 700;
+    font-size: 8pt;
+    width: 30%;
+    color: #444;
+  }
+
+  /* ── Tabela operacji ──────────────────────────────────────── */
+  .ops-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 9pt;
+  }
+  .ops-table th {
+    background: #e8f0f8;
+    color: #1a3a5c;
+    font-size: 8pt;
+    font-weight: 700;
+    padding: 5px 8px;
+    border: 1px solid #dde1e6;
+    text-align: left;
+  }
+  .ops-table td {
+    padding: 5px 8px;
+    border: 1px solid #dde1e6;
+  }
+  .ops-table tr:nth-child(even) td { background: #f9fafb; }
+
+  /* ── Bloki SOP ────────────────────────────────────────────── */
+  .sop-list {
+    list-style: none;
+    counter-reset: sop-counter;
+  }
+  .sop-list li {
+    counter-increment: sop-counter;
+    display: flex;
+    align-items: flex-start;
+    gap: 8px;
+    padding: 5px 8px;
+    border-bottom: 1px solid #eee;
+    font-size: 9.5pt;
+  }
+  .sop-list li:last-child { border-bottom: none; }
+  .sop-num {
+    min-width: 22px;
+    height: 22px;
+    background: #1a3a5c;
+    color: #fff;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 8pt;
+    font-weight: 700;
+    flex-shrink: 0;
+  }
+
+  /* ── Karta Kontrolna ──────────────────────────────────────── */
+  .check-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 6px;
+  }
+  .check-item {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 6px 8px;
+    border: 1px solid #dde1e6;
+    border-radius: 4px;
+  }
+  .checkbox {
+    width: 16px;
+    height: 16px;
+    border: 2px solid #1a3a5c;
+    flex-shrink: 0;
+    display: inline-block;
+  }
+
+  /* ── Podpisy ──────────────────────────────────────────────── */
+  .signatures {
+    display: grid;
+    grid-template-columns: 1fr 1fr 1fr;
+    gap: 12px;
+    margin-top: 20px;
+  }
+  .signature-box {
+    border-top: 1px solid #111;
+    padding-top: 4px;
+    font-size: 8pt;
+    color: #555;
+    text-align: center;
+  }
+
+  /* ── Stopka ───────────────────────────────────────────────── */
+  .footer {
+    border-top: 1px solid #dde1e6;
+    margin-top: 16px;
+    padding-top: 6px;
+    font-size: 7.5pt;
+    color: #999;
+    display: flex;
+    justify-content: space-between;
+  }
+
+  @media print {
+    body { padding: 10mm; }
+  }
+</style>
+</head>
+<body>
+
+<!-- ═══ NAGŁÓWEK ═══════════════════════════════════════════════ -->
+<div class="header">
+  <div>
+    <div class="company-name">RCM Sp. z o.o.</div>
+    <div class="company-sub">ul. Graniczna 3, 19-500 Gołdap &nbsp;|&nbsp; Metalwork &amp; Welding</div>
+  </div>
+  <div class="doc-title">
+    <h1>Arkusz Zlecenia Wewnętrznego</h1>
+    <div class="nr">Nr: {{ order.order_number or ('ZW-' + order.id|string) }}</div>
+    <div class="date">Data wydruku: {{ today }}</div>
+  </div>
+</div>
+
+<!-- ═══ DANE ZLECENIA ═══════════════════════════════════════════ -->
+<div class="section">
+  <div class="section-title">1. Dane zlecenia</div>
+  <table class="info-table">
+    <tr>
+      <td class="label">Klient</td>
+      <td>{{ order.client }}</td>
+      <td class="label">Termin (graniczny)</td>
+      <td><strong>{{ order.deadline or '—' }}</strong></td>
+    </tr>
+    <tr>
+      <td class="label">Typ zlecenia</td>
+      <td>
+        {% if order.order_type == 'catalog' %}Produkt z katalogu
+        {% elif order.order_type == 'remont' %}Remont / Naprawa
+        {% else %}Nowa część / Projekt{% endif %}
+      </td>
+      <td class="label">Materiał</td>
+      <td>{{ order.material or '—' }}</td>
+    </tr>
+    {% if order.description %}
+    <tr>
+      <td class="label">Opis problemu</td>
+      <td colspan="3">{{ order.description }}</td>
+    </tr>
+    {% endif %}
+    {% if order.requires_visit %}
+    <tr>
+      <td class="label">Uwaga</td>
+      <td colspan="3" style="color:#c62828;font-weight:700">
+        ⚠ Wymaga wizyty u klienta (pomiary na miejscu)
+      </td>
+    </tr>
+    {% endif %}
+    {% if order.notes %}
+    <tr>
+      <td class="label">Uwagi</td>
+      <td colspan="3">{{ order.notes }}</td>
+    </tr>
+    {% endif %}
+  </table>
+</div>
+
+<!-- WYCENA CELOWO POMINIĘTA — dokument techniczny dla pracowników.
+     Ceny i marże widoczne wyłącznie w systemie ERP dla Biuro/Dyrektor. -->
+
+<!-- ═══ OPERACJE DO WYKONANIA ═══════════════════════════════════ -->
+{% if sop_template and sop_template.operations_json %}
+<div class="section">
+  <div class="section-title">2. Operacje do wykonania</div>
+  <table class="ops-table">
+    <thead>
+      <tr>
+        <th style="width:30px">#</th>
+        <th>Operacja</th>
+        <th style="width:80px">Czas (h)</th>
+        <th>Maszyna</th>
+        <th>Osoba odpowiedzialna</th>
+        <th style="width:60px">Status</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for op in sop_template.operations_json %}
+      <tr>
+        <td style="text-align:center">{{ loop.index }}</td>
+        <td><strong>{{ op.op }}</strong></td>
+        <td style="text-align:center">{{ op.hours or '—' }}</td>
+        <td>
+          {% if sop_template.machines_json %}
+            {% for m in sop_template.machines_json %}
+              {% if m.required %}<span style="font-size:8pt">{{ m.machine }}</span><br>{% endif %}
+            {% endfor %}
+          {% else %}—{% endif %}
+        </td>
+        <td>{{ op.responsible or '—' }}</td>
+        <td style="text-align:center">☐</td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+{% endif %}
+
+<!-- ═══ INSTRUKCJA SOP ══════════════════════════════════════════ -->
+{% if sop_template and sop_template.instruction_blocks %}
+<div class="section">
+  <div class="section-title">3. Instrukcja wykonania (SOP)</div>
+  <ul class="sop-list">
+    {% for block in sop_template.instruction_blocks %}
+    <li>
+      <span class="sop-num">{{ block.order or loop.index }}</span>
+      <span>{{ block.text }}</span>
+    </li>
+    {% endfor %}
+  </ul>
+</div>
+{% endif %}
+
+<!-- ═══ ZAPOTRZEBOWANIE MATERIAŁOWE ════════════════════════════ -->
+{% if sop_template and sop_template.materials_json %}
+<div class="section">
+  <div class="section-title">4. Zapotrzebowanie materiałowe</div>
+  <table class="ops-table">
+    <thead>
+      <tr>
+        <th>#</th>
+        <th>Materiał</th>
+        <th>Ilość</th>
+        <th>Jednostka</th>
+        <th style="width:80px">Wydano ☐</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for mat in sop_template.materials_json %}
+      <tr>
+        <td style="text-align:center">{{ loop.index }}</td>
+        <td>{{ mat.mat }}</td>
+        <td style="text-align:center">
+          {% if order.quantity and order.order_type == 'catalog' %}
+            {{ (mat.qty_kg or mat.qty or 1) * order.quantity }}
+          {% else %}
+            {{ mat.qty_kg or mat.qty or '—' }}
+          {% endif %}
+        </td>
+        <td>{{ mat.unit or 'kg' }}</td>
+        <td style="text-align:center">☐</td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+{% endif %}
+
+<!-- ═══ KARTA KONTROLNA WYROBU ══════════════════════════════════ -->
+<div class="section">
+  <div class="section-title">5. Karta Kontrolna Wyrobu (po każdym etapie)</div>
+  <div class="check-grid">
+    <div class="check-item">
+      <span class="checkbox"></span>
+      <span>Sprawdzenie wymiarów liniowych</span>
+    </div>
+    <div class="check-item">
+      <span class="checkbox"></span>
+      <span>Sprawdzenie wymiarów geometrycznych</span>
+    </div>
+    <div class="check-item">
+      <span class="checkbox"></span>
+      <span>Sprawdzenie wymogów powierzchni</span>
+    </div>
+    <div class="check-item" style="background:#fff8e1">
+      <span class="checkbox" style="border-color:#e65100"></span>
+      <span style="color:#e65100;font-weight:700">Kontrola końcowa — WYROBY</span>
+    </div>
+  </div>
+</div>
+
+<!-- ═══ PODPISY ═════════════════════════════════════════════════ -->
+<div class="signatures">
+  <div class="signature-box">Wystawił (Biuro)<br><br>___________________<br>Data: ____________</div>
+  <div class="signature-box">Zatwierdził (Technolog)<br><br>___________________<br>Data: ____________</div>
+  <div class="signature-box">Kontrola jakości<br><br>___________________<br>Data: ____________</div>
+</div>
+
+<!-- ═══ STOPKA ══════════════════════════════════════════════════ -->
+<div class="footer">
+  <span>RCM Sp. z o.o. | ul. Graniczna 3, 19-500 Gołdap</span>
+  <span>Arkusz wygenerowany automatycznie przez RCM ERP | {{ today }}</span>
+  <span>Nr: {{ order.order_number or order.id }}</span>
+</div>
+
+</body>
+</html>
