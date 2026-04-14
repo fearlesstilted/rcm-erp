@@ -122,7 +122,7 @@ def list_orders(
         q = q.filter(Order.status == status)
     if branch:
         q = q.filter(Order.triage_branch == branch)
-    return q.order_by(Order.deadline.asc()).all()
+    return q.order_by(Order.created_at.desc()).all()
 
 
 @app.get("/api/orders/{order_id}", response_model=OrderOut)
