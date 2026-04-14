@@ -88,6 +88,39 @@ uvicorn main:app --reload --port 8000
 
 ---
 
+## Что было сделано в сессии (2026-04-14)
+
+### Исправленные баги
+1. **order_type не приходил с API** — не был добавлен в `OrderOut` схему. Поле `—` в модале Szczegóły. Исправлено: добавлено `order_type` и `purpose` в `schemas.py`.
+2. **Сортировка заказов** — было по `deadline.asc()`, заказы шли вперемешку. Исправлено: `created_at.desc()` (новые сверху).
+3. **favicon.ico 404 спам** — добавлен route `GET /favicon.ico → 204`.
+
+### Новые фичи
+- **Soft-delete заказов**: `DELETE /api/orders/{id}` → `status=cancelled`. Кнопка "🗑 Usuń zlecenie" в модале Szczegóły с `confirm()`.
+- **Cancelled заказы скрыты** из списка (фильтр на фронте).
+- **GitHub Issues** — созданы 5 issues с роадмапом (#1 edit, #2-3 warnings, #4 статусы, #5 WhatsApp).
+- **GitHub Actions CI** — `rcm_erp/.github/workflows/ci.yml` добавлен внутрь папки (раньше не попадал в subtree push).
+- **GitHub topics** — python, fastapi, vue3, erp, sqlite, triage, manufacturing.
+- **ngrok** — для показа коллеге: `C:\ngrok\ngrok.exe http 8001`.
+
+### Текущие PIN для входа
+- Biuro: `1111` | Technolog: `2222` | Dyrektor: `3333`
+
+### Запуск (актуальный порт 8001, не 8000!)
+```bash
+cd rcm_erp/backend
+uvicorn main:app --host 0.0.0.0 --port 8001 --reload
+```
+> Порт 8000 занят Windows System (PID 4) на этой машине.
+
+### Open Issues (приоритеты)
+1. **#1** Edit заказа из модала — самое нужное
+2. **#4** Статусы: in_progress → done → shipped
+3. **#5** WhatsApp notify через Make.com
+4. **#2/#3** Deprecation warnings — мелочь, 15 минут
+
+---
+
 ## Что было сделано в этой сессии (2026-04-13)
 
 ### Исправленные баги
