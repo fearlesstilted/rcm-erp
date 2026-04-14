@@ -75,6 +75,11 @@ def _generate_order_number(db: Session) -> str:
 # =============================================================================
 # HEALTH CHECK
 # =============================================================================
+@app.get("/favicon.ico", include_in_schema=False)
+def favicon():
+    return Response(status_code=204)  # no content — ucisza spam w logach
+
+
 @app.get("/api/health")
 def health():
     return {"status": "ok", "system": "RCM ERP"}
