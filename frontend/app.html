@@ -824,7 +824,9 @@
             </tr>
           </table>
         </template>
-        <div style="margin-top:16px;text-align:right">
+        <div style="margin-top:16px;display:flex;justify-content:space-between;align-items:center">
+          <button class="btn btn-sm" style="color:#c62828;border:1px solid #c62828;background:none;border-radius:6px;padding:6px 14px;cursor:pointer"
+                  @click="deleteOrder(detailsModal.order)">🗑 Usuń zlecenie</button>
           <button class="btn btn-outline" @click="detailsModal.show=false">Zamknij</button>
         </div>
       </div>
@@ -1082,7 +1084,15 @@ createApp({
 
     // ── Loader ────────────────────────────────────────────────────────────
     async function loadOrders() {
-      orders.value = await api("/orders")
+      const all = await api("/orders")
+      orders.value = all.filter(o => o.status !== "cancelled")  // ukryj anulowane
+    }
+
+    async function deleteOrder(order) {
+      if (!confirm(`Usunąć zlecenie #${order.order_number}?\nMożna przywrócić ręcznie z bazy.`)) return
+      await api(`/orders/${order.id}`, { method: "DELETE" })
+      detailsModal.value.show = false
+      await loadOrders()
     }
 
     async function loadPytania() {
@@ -1253,7 +1263,7 @@ createApp({
       loadOrders, loadTemplates, loadAnalytics, loadHarmonogram, loadPytania, submitAnswer,
       toggleParams,
       submitOrderAndTriage, calcQuote,
-      openOrder, openQuoteModal, openZaporModal, openParamsModal,
+      openOrder, deleteOrder, openQuoteModal, openZaporModal, openParamsModal,
       submitQuote, submitZapor, submitParamRequest,
       addSopBlock, removeSopBlock, saveTemplate,
       isOverdue,

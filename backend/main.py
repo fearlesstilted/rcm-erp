@@ -138,6 +138,17 @@ def get_order(order_id: int, db: Session = Depends(get_db)):
     return order
 
 
+@app.delete("/api/orders/{order_id}", status_code=204)
+def delete_order(order_id: int, db: Session = Depends(get_db)):
+    """Soft-delete: ustawia status='cancelled'. Nie usuwa z bazy."""
+    order = db.query(Order).get(order_id)
+    if not order:
+        raise HTTPException(status_code=404, detail="Zlecenie nie znalezione")
+    order.status = "cancelled"
+    db.commit()
+    return Response(status_code=204)
+
+
 # =============================================================================
 # TRIAGE — silnik routingu (Odrzut / Standard / Niestandard)
 # =============================================================================

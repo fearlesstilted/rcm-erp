@@ -48,9 +48,11 @@ class OrderOut(BaseModel):
     has_drawing:   bool
     material:      Optional[str]
     notes:         Optional[str]
+    order_type:    Optional[str]   = None
     sop_name:      Optional[str]   = None
     template_id:   Optional[int]   = None
     description:   Optional[str]   = None
+    purpose:       Optional[str]   = None
     requires_visit: bool           = False
     quantity:      Optional[int]   = None
     estimated_value: Optional[float] = None
