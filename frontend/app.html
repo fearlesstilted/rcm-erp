@@ -240,17 +240,17 @@
             <div style="display:flex;gap:12px;flex-wrap:wrap;margin-top:16px">
               <button class="btn btn-outline" style="flex:1;min-width:140px;padding:20px"
                       :class="{'btn-primary': wForm.order_type==='remont'}"
-                      @click="wForm.order_type='remont';wStep=2">
+                      @click="selectType('remont')">
                 🔧 Remont / Naprawa
               </button>
               <button class="btn btn-outline" style="flex:1;min-width:140px;padding:20px"
                       :class="{'btn-primary': wForm.order_type==='catalog'}"
-                      @click="wForm.order_type='catalog';wStep=2">
+                      @click="selectType('catalog')">
                 📋 Produkt z katalogu
               </button>
               <button class="btn btn-outline" style="flex:1;min-width:140px;padding:20px"
                       :class="{'btn-primary': wForm.order_type==='nowa_czesc'}"
-                      @click="wForm.order_type='nowa_czesc';wStep=2">
+                      @click="selectType('nowa_czesc')">
                 ⚙️ Nowa część / Projekt
               </button>
             </div>
@@ -1012,13 +1012,25 @@ createApp({
     function resetWizard() {
       wStep.value = 1
       triageResult.value = null
-      triageError.value  = null
+      triageError.value   = null
       triageLoading.value = false
       wForm.value = {
         client: "", deadline: "", material: "", has_drawing: false,
         order_type: "", sop_name: "", purpose: "", notes: "", estimated_value: 0,
         description: "", requires_visit: false, is_defence: false, template_id: null, quantity: 1,
       }
+    }
+
+    // Wybór typu w Step 1 — zawsze czyści formularz, żeby dane starego zlecenia
+    // nie wyciekały do nowego formularza po "← Wróć"
+    function selectType(type) {
+      wForm.value = {
+        client: "", deadline: "", material: "", has_drawing: false,
+        order_type: type, sop_name: "", purpose: "", notes: "", estimated_value: 0,
+        description: "", requires_visit: false, is_defence: false, template_id: null, quantity: 1,
+      }
+      triageError.value = null
+      wStep.value = 2
     }
 
     // ── API helpers ───────────────────────────────────────────────────────
@@ -1209,7 +1221,7 @@ createApp({
       showNewTemplate, newTemplate,
       sopLibrary, paramQuestions,
       nonstandardOrders, catalogPrice, onTemplateChange,
-      login, logout, resetWizard,
+      login, logout, resetWizard, selectType,
       pytania, answerDraft, pendingCount, orderParams, expandedParams,
       loadOrders, loadTemplates, loadAnalytics, loadHarmonogram, loadPytania, submitAnswer,
       toggleParams,
