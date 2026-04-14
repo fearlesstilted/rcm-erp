@@ -85,6 +85,29 @@ class QuoteCreate(BaseModel):
     line_items:    List[Any] = Field(default_factory=list)
 
 
+class ProcessItem(BaseModel):
+    """Pojedynczy proces w strukturalnej wycenie technologa."""
+    name: str
+    cost: float
+
+
+class QuoteStructuredCreate(BaseModel):
+    """
+    Strukturalna wycena wg formuły technologa.
+    Priorytety: procesy → materiał → waga × stawka → czas spawania → robocizna.
+    """
+    processes:          List[ProcessItem] = Field(default_factory=list)
+    material_cost:      float = 0
+    weight_kg:          float = 0
+    weight_rate_pln_kg: float = 15    # 7–30 PLN/kg zależnie od złożoności projektu
+    welding_hours:      float = 0
+    weight_netto_kg:    float = 0     # informacyjnie
+    weight_brutto_kg:   float = 0     # informacyjnie
+    overhead_pct:       float = 0.10
+    margin_pct:         float = 0.25
+    labor_hours:        float = 0     # opcjonalna dodatkowa robocizna poza spawaniem
+
+
 class QuoteZaporCreate(BaseModel):
     """
     Zaporowa marża — Technolog klika jeden przycisk.
@@ -103,6 +126,14 @@ class QuoteOut(BaseModel):
     margin_pct:    Optional[float]
     is_zapor:      bool
     created_at:    datetime
+    # Pola v2 — None dla starych wycen
+    processes_json:     Optional[List[Any]] = None
+    weight_kg:          Optional[float]     = None
+    weight_rate_pln_kg: Optional[float]     = None
+    welding_hours:      Optional[float]     = None
+    weight_netto_kg:    Optional[float]     = None
+    weight_brutto_kg:   Optional[float]     = None
+    estimate_version:   Optional[str]       = None
     model_config = {"from_attributes": True}
 
 
@@ -199,6 +230,21 @@ class TemplateOut(BaseModel):
     base_price_pln:     Optional[float]
     margin_pct:         float
     is_active:          bool
+    model_config = {"from_attributes": True}
+
+
+# =============================================================================
+# ATTACHMENTS — Załączniki (rysunki, dokumentacja)
+# =============================================================================
+class AttachmentOut(BaseModel):
+    id:          int
+    order_id:    int
+    filename:    str
+    stored_path: str
+    size_bytes:  Optional[int]  = None
+    mime_type:   Optional[str]  = None
+    uploaded_by: Optional[str]  = None
+    uploaded_at: datetime
     model_config = {"from_attributes": True}
 
 

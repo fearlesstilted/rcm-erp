@@ -3,28 +3,32 @@ RCM ERP — FastAPI Backend
 Uruchomienie: uvicorn main:app --host 0.0.0.0 --port 8000 --reload
 Dostęp z sieci lokalnej: http://192.168.1.15:8000
 """
+import pathlib
 import random
+import uuid
 from datetime import datetime, date
 from typing import List, Optional
 
-from fastapi import FastAPI, Depends, HTTPException
+from fastapi import FastAPI, Depends, HTTPException, UploadFile, File, Form
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 from fastapi.responses import FileResponse, Response
 from pdf_gen import generate_arkusz_pdf
 from sqlalchemy.orm import Session
-from sqlalchemy import create_engine, func
+from sqlalchemy import create_engine, func, text
 from sqlalchemy.orm import sessionmaker
 
 from models import (
     Base, Order, OrderOperation, Quote, MaterialRequest,
     QualityCard, ProductTemplate, ConstraintRule, PriceHistory,
     ParameterRequest, StockMovement, ComponentContainer,
-    Setting, OrderStatus, TriageBranch, init_db
+    Setting, OrderStatus, TriageBranch, OrderAttachment, init_db
 )
 from schemas import (
     OrderCreate, OrderOut, TriageResponse,
     QuoteCreate, QuoteZaporCreate, QuoteOut,
+    QuoteStructuredCreate,
+    AttachmentOut,
     MaterialRequestCreate, MaterialRequestOut,
     QualityCardCreate, QualityCardOut,
     ParameterRequestCreate, ParameterRequestAnswer, ParameterRequestOut,
@@ -39,12 +43,44 @@ engine = create_engine(DATABASE_URL, connect_args={"check_same_thread": False})
 SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
 Base.metadata.create_all(bind=engine)  # tworzy tabele jeśli nie istnieją
 
+# ─── Idempotentna migracja kolumn v2 dla istniejących baz ────────────────────
+def _ensure_quote_v2_columns(eng) -> None:
+    """
+    Dodaje nowe kolumny do tabeli quotes jeśli ich nie ma.
+    SQLite obsługuje tylko ALTER TABLE ADD COLUMN — bez ryzyka utraty danych.
+    """
+    new_cols = [
+        ("processes_json",     "TEXT DEFAULT '[]'"),
+        ("weight_kg",          "REAL DEFAULT 0"),
+        ("weight_rate_pln_kg", "REAL DEFAULT 15"),
+        ("welding_hours",      "REAL DEFAULT 0"),
+        ("weight_netto_kg",    "REAL DEFAULT 0"),
+        ("weight_brutto_kg",   "REAL DEFAULT 0"),
+        ("estimate_version",   "TEXT DEFAULT 'v1'"),
+    ]
+    with eng.connect() as conn:
+        existing = {row[1] for row in conn.execute(text("PRAGMA table_info(quotes)"))}
+        for col_name, col_def in new_cols:
+            if col_name not in existing:
+                conn.execute(text(f"ALTER TABLE quotes ADD COLUMN {col_name} {col_def}"))
+        conn.commit()
+
+_ensure_quote_v2_columns(engine)
+
+# ─── Katalog dla załączników ──────────────────────────────────────────────────
+UPLOAD_ROOT = pathlib.Path(__file__).parent / "uploads"
+UPLOAD_ROOT.mkdir(exist_ok=True)
+MAX_UPLOAD_BYTES = 50 * 1024 * 1024   # 50 MB limit
+
 # ─── FastAPI app ──────────────────────────────────────────────────────────────
 app = FastAPI(
     title="RCM ERP",
     description="System CPQ/ERP dla RCM Sp. z o.o. — Gołdap",
     version="0.1.0",
 )
+
+# Serwowanie załączników statycznie — /uploads/{order_id}/{filename}
+app.mount("/uploads", StaticFiles(directory=str(UPLOAD_ROOT)), name="uploads")
 
 # CORS — pozwala frontendowi Vue na localhost lub 192.168.x.x łączyć się z API
 app.add_middleware(
@@ -227,6 +263,9 @@ def create_quote(order_id: int, payload: QuoteCreate, db: Session = Depends(get_
         is_zapor      = False,
     )
     db.add(quote)
+    # Zlecenie niestandard → quoted po zapisaniu wyceny
+    if order.status == OrderStatus.niestandard:
+        order.status = OrderStatus.quoted
     db.commit()
     db.refresh(quote)
     return quote
@@ -258,6 +297,9 @@ def create_zapor_quote(order_id: int, payload: QuoteZaporCreate, db: Session = D
         is_zapor      = True,
     )
     db.add(quote)
+    # Zlecenie niestandard → quoted po zapisaniu wyceny
+    if order.status == OrderStatus.niestandard:
+        order.status = OrderStatus.quoted
     db.commit()
     db.refresh(quote)
     return quote
@@ -269,6 +311,170 @@ def get_quote(order_id: int, db: Session = Depends(get_db)):
     if not quote:
         raise HTTPException(status_code=404, detail="Brak wyceny dla tego zlecenia")
     return quote
+
+
+@app.post("/api/orders/{order_id}/quote/structured", response_model=QuoteOut, status_code=201)
+def create_structured_quote(
+    order_id: int, payload: QuoteStructuredCreate, db: Session = Depends(get_db)
+):
+    """
+    Strukturalna wycena technologa wg jego formuły (v2).
+    Formuła: procesy + materiał + waga×stawka + spawanie×stawka + robocizna_extra
+    Następnie: ×(1+overhead) ×(1+marża)
+    """
+    order = db.query(Order).get(order_id)
+    if not order:
+        raise HTTPException(status_code=404, detail="Zlecenie nie znalezione")
+
+    rate_setting = db.query(Setting).get("labor_rate_pln")
+    labor_rate   = float(rate_setting.value) if rate_setting else 90.0
+
+    proc_total    = sum(p.cost for p in payload.processes)
+    weight_total  = payload.weight_kg * payload.weight_rate_pln_kg
+    welding_total = payload.welding_hours * labor_rate
+    extra_labor   = payload.labor_hours * labor_rate
+    base          = proc_total + payload.material_cost + weight_total + welding_total + extra_labor
+    subtotal      = base * (1 + payload.overhead_pct)
+    total_net     = subtotal * (1 + payload.margin_pct)
+
+    # Upsert — jeden Quote na zlecenie (zastępuje poprzednią wycenę)
+    quote = db.query(Quote).filter(Quote.order_id == order_id).first()
+    if not quote:
+        quote = Quote(order_id=order_id)
+        db.add(quote)
+
+    quote.line_items         = []
+    quote.processes_json     = [p.model_dump() for p in payload.processes]
+    quote.material_cost      = payload.material_cost
+    quote.weight_kg          = payload.weight_kg
+    quote.weight_rate_pln_kg = payload.weight_rate_pln_kg
+    quote.welding_hours      = payload.welding_hours
+    quote.weight_netto_kg    = payload.weight_netto_kg
+    quote.weight_brutto_kg   = payload.weight_brutto_kg
+    quote.labor_hours        = payload.labor_hours + payload.welding_hours
+    quote.overhead_pct       = payload.overhead_pct
+    quote.margin_pct         = payload.margin_pct
+    quote.total_net          = round(total_net, 2)
+    quote.is_zapor           = False
+    quote.estimate_version   = "v2"
+
+    # Zlecenie niestandard → quoted
+    if order.status == OrderStatus.niestandard:
+        order.status = OrderStatus.quoted
+
+    db.commit()
+    db.refresh(quote)
+    return quote
+
+
+@app.post("/api/orders/{order_id}/confirm", response_model=OrderOut)
+def confirm_order(order_id: int, db: Session = Depends(get_db)):
+    """Biuro zatwierdza wycenę Technologa → zlecenie trafia do produkcji."""
+    order = db.query(Order).get(order_id)
+    if not order:
+        raise HTTPException(status_code=404, detail="Zlecenie nie znalezione")
+    if order.status != OrderStatus.quoted:
+        raise HTTPException(status_code=409, detail="Tylko zlecenia w statusie 'quoted' można zatwierdzić")
+    order.status = OrderStatus.in_production
+    db.commit()
+    db.refresh(order)
+    return order
+
+
+@app.post("/api/orders/{order_id}/save-as-template", response_model=TemplateOut, status_code=201)
+def save_order_as_template(order_id: int, payload: dict, db: Session = Depends(get_db)):
+    """
+    Technolog zapisuje niestandard jako szablon SOP — jeśli zlecenie się powtórzy,
+    następnym razem trafi do gałęzi Standard automatycznie.
+    """
+    order = db.query(Order).get(order_id)
+    if not order:
+        raise HTTPException(status_code=404, detail="Zlecenie nie znalezione")
+    quote = db.query(Quote).filter(Quote.order_id == order_id).first()
+
+    # Wyprowadź operacje z processes_json (v2) lub pusty
+    ops = []
+    if quote and quote.processes_json:
+        ops = [{"op": p["name"], "hours": 0, "cost": p["cost"]} for p in quote.processes_json]
+
+    # Materiał z wagi jeśli dostępny
+    mats = []
+    if quote and quote.weight_kg:
+        mats = [{"mat": order.material or "Materiał", "qty_kg": float(quote.weight_kg), "unit": "kg"}]
+
+    tmpl = ProductTemplate(
+        name               = payload.get("name") or f"Z zlecenia {order.order_number}",
+        category           = payload.get("category") or order.order_type or "remont",
+        operations_json    = ops,
+        materials_json     = mats,
+        instruction_blocks = [],
+        machines_json      = [],
+        base_price_pln     = float(quote.total_net) if quote and quote.total_net else None,
+        margin_pct         = float(quote.margin_pct or 0.25) if quote else 0.25,
+    )
+    db.add(tmpl)
+    db.commit()
+    db.refresh(tmpl)
+    return tmpl
+
+
+# =============================================================================
+# ATTACHMENTS — Załączniki (rysunki, dokumentacja techniczna)
+# =============================================================================
+
+@app.post("/api/orders/{order_id}/attachments", response_model=AttachmentOut, status_code=201)
+async def upload_attachment(
+    order_id: int,
+    file: UploadFile = File(...),
+    uploaded_by: str = Form(default="technolog"),
+    db: Session = Depends(get_db),
+):
+    """Wgraj plik (rysunek, PDF) do zlecenia. Max 50 MB."""
+    order = db.query(Order).get(order_id)
+    if not order:
+        raise HTTPException(status_code=404, detail="Zlecenie nie znalezione")
+
+    data = await file.read()
+    if len(data) > MAX_UPLOAD_BYTES:
+        raise HTTPException(status_code=413, detail="Plik za duży (max 50 MB)")
+
+    # Folder dla zlecenia, plik z losowym prefiksem (zapobiega kolizjom nazw)
+    order_dir = UPLOAD_ROOT / str(order_id)
+    order_dir.mkdir(exist_ok=True)
+    safe_name = f"{uuid.uuid4().hex[:8]}_{file.filename}"
+    dest      = order_dir / safe_name
+    dest.write_bytes(data)
+
+    att = OrderAttachment(
+        order_id    = order_id,
+        filename    = file.filename,
+        stored_path = f"uploads/{order_id}/{safe_name}",
+        size_bytes  = len(data),
+        mime_type   = file.content_type,
+        uploaded_by = uploaded_by,
+    )
+    db.add(att)
+    db.commit()
+    db.refresh(att)
+    return att
+
+
+@app.get("/api/orders/{order_id}/attachments", response_model=List[AttachmentOut])
+def list_attachments(order_id: int, db: Session = Depends(get_db)):
+    """Lista załączników dla zlecenia."""
+    return db.query(OrderAttachment).filter(OrderAttachment.order_id == order_id).all()
+
+
+@app.delete("/api/attachments/{att_id}", status_code=204)
+def delete_attachment(att_id: int, db: Session = Depends(get_db)):
+    """Usuń załącznik — kasuje plik z dysku i rekord z bazy."""
+    att = db.query(OrderAttachment).get(att_id)
+    if not att:
+        raise HTTPException(status_code=404, detail="Załącznik nie znaleziony")
+    pathlib.Path(att.stored_path).unlink(missing_ok=True)   # usuń plik (cicho jeśli już nie ma)
+    db.delete(att)
+    db.commit()
+    return Response(status_code=204)
 
 
 # =============================================================================

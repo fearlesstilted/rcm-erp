@@ -17,6 +17,7 @@ class OrderStatus(str, enum.Enum):
     triage       = "triage"
     standard     = "standard"
     niestandard  = "niestandard"
+    quoted       = "quoted"        # Technolog zapisał wycenę, czeka na akceptację Biura
     rejected     = "rejected"
     in_production = "in_production"
     done         = "done"
@@ -101,6 +102,7 @@ class Order(Base):
     material_request = relationship("MaterialRequest", back_populates="order", uselist=False)
     quality_cards    = relationship("QualityCard", back_populates="order", cascade="all, delete")
     param_requests   = relationship("ParameterRequest", back_populates="order", cascade="all, delete")
+    attachments      = relationship("OrderAttachment", back_populates="order", cascade="all, delete")
 
 
 # =============================================================================
@@ -254,11 +256,40 @@ class Quote(Base):
     pdf_path      = Column(String(500))
     created_at    = Column(DateTime, default=datetime.utcnow)
 
+    # --- Wycena strukturalna v2 (formuła technologa) ---
+    # processes_json: [{name: "Cięcie plazmą", cost: 150.0}, ...]
+    processes_json     = Column(JSON, default=list)
+    weight_kg          = Column(Numeric(10, 3), default=0)
+    weight_rate_pln_kg = Column(Numeric(6, 2), default=15)   # 7–30 PLN/kg zależnie od złożoności
+    welding_hours      = Column(Numeric(8, 2), default=0)
+    weight_netto_kg    = Column(Numeric(10, 3), default=0)   # informacyjnie — nie wchodzi do ceny
+    weight_brutto_kg   = Column(Numeric(10, 3), default=0)   # informacyjnie — nie wchodzi do ceny
+    estimate_version   = Column(String(10), default="v1")    # v1=legacy, v2=structured
+
     order = relationship("Order", back_populates="quote")
 
 
 # =============================================================================
-# 10. PRICE HISTORY (Historia cen — "jak ostatnim razem")
+# 10. ORDER ATTACHMENTS (Załączniki — rysunki, dokumentacja)
+#     Technolog może dołączyć PDF/DXF/JPG do zlecenia
+# =============================================================================
+class OrderAttachment(Base):
+    __tablename__ = "order_attachments"
+
+    id          = Column(Integer, primary_key=True)
+    order_id    = Column(Integer, ForeignKey("orders.id"), nullable=False)
+    filename    = Column(String(255), nullable=False)     # oryginalna nazwa pliku
+    stored_path = Column(String(500), nullable=False)     # uploads/{order_id}/{uuid}_{name}
+    size_bytes  = Column(Integer)
+    mime_type   = Column(String(100))
+    uploaded_by = Column(String(50))   # "technolog" / "biuro" — rola z PIN
+    uploaded_at = Column(DateTime, default=datetime.utcnow)
+
+    order = relationship("Order", back_populates="attachments")
+
+
+# =============================================================================
+# 11. PRICE HISTORY (Historia cen — "jak ostatnim razem")
 #     Seed: Lista zleceń usługi.xlsx / Lista zleceń usługi_1.xlsx
 #     Cel: Claude API może zaproponować cenę na podstawie podobnych historycznych zleceń
 # =============================================================================
@@ -276,7 +307,7 @@ class PriceHistory(Base):
 
 
 # =============================================================================
-# 11. SKŁADOWANIE PÓŁPRODUKTÓW (Magazyn — Dokument Przyjęcia / Rozchodowy)
+# 12. SKŁADOWANIE PÓŁPRODUKTÓW (Magazyn — Dokument Przyjęcia / Rozchodowy)
 #     Pola: ile, jakie zlecenie, kiedy, wyrób
 # =============================================================================
 class StockMovement(Base):
@@ -293,7 +324,7 @@ class StockMovement(Base):
 
 
 # =============================================================================
-# 12. SKŁADOWANIE KOMPONENTÓW MENW. (Pojemniki zbiorcze)
+# 13. SKŁADOWANIE KOMPONENTÓW MENW. (Pojemniki zbiorcze)
 #     Pola: Numer zlecenia MENW, Lista Zbiorcza E, Oznaczenie pojemnika, Rejestr rozchodów
 # =============================================================================
 class ComponentContainer(Base):
@@ -309,7 +340,7 @@ class ComponentContainer(Base):
 
 
 # =============================================================================
-# 13. PARAMETER REQUESTS ("Zapytaj o parametry" — Technolog → Biuro)
+# 14. PARAMETER REQUESTS ("Zapytaj o parametry" — Technolog → Biuro)
 #     Technolog nie dzwoni, wysyła pytanie w systemie
 # =============================================================================
 class ParameterRequest(Base):
@@ -327,7 +358,7 @@ class ParameterRequest(Base):
 
 
 # =============================================================================
-# 14. SETTINGS (Ustawienia systemowe — bez restartu serwera)
+# 15. SETTINGS (Ustawienia systemowe — bez restartu serwera)
 #     Dyrektor zmienia stawki przez API, nie przez plik konfiguracyjny
 # =============================================================================
 class Setting(Base):
