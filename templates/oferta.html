@@ -189,7 +189,7 @@
   <div class="label">Oferta dla:</div>
   <div class="name">{{ order.client }}</div>
   {% if order.deadline %}
-  <div class="deadline">Planowany termin realizacji: <strong>{{ order.deadline }}</strong></div>
+  <div class="deadline">Planowany termin realizacji: <strong>{{ order.deadline.strftime('%d.%m.%Y') if order.deadline else '—' }}</strong></div>
   {% endif %}
   {% if order.is_defence %}
   <div style="margin-top:6px;color:#c62828;font-weight:700;font-size:9pt">

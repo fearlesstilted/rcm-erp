@@ -198,7 +198,7 @@
     <nav>
       <!-- Biuro widzi: Nowe zlecenie, Lista zleceń, Pytania od Technologa -->
       <template v-if="currentUser.role === 'biuro'">
-        <button :class="{active: tab==='wizard'}"  @click="tab='wizard'">+ Nowe zlecenie</button>
+        <button :class="{active: tab==='wizard'}"  @click="tab='wizard';resetWizard()">+ Nowe zlecenie</button>
         <button :class="{active: tab==='orders'}"  @click="tab='orders';loadOrders()">Lista zleceń</button>
         <button :class="{active: tab==='pytania'}" @click="tab='pytania';loadPytania()"
                 style="display:flex;align-items:center;gap:6px">
@@ -371,11 +371,15 @@
               </div>
             </div>
 
+            <div v-if="triageError" style="color:var(--rcm-red);background:#fff0f0;border:1px solid var(--rcm-red);border-radius:6px;padding:10px 14px;margin-top:12px;font-size:.9rem">
+              ⚠ {{ triageError }}
+            </div>
             <div style="display:flex;gap:8px;margin-top:16px">
-              <button class="btn btn-outline" @click="wStep=1">← Wróć</button>
+              <button class="btn btn-outline" @click="wStep=1;triageError=null">← Wróć</button>
               <button class="btn btn-primary" @click="submitOrderAndTriage"
-                      :disabled="!wForm.client || !wForm.deadline || (wForm.order_type==='catalog' && !wForm.template_id)">
-                Wyślij do Triage →
+                      :disabled="triageLoading || !wForm.client || !wForm.deadline || (wForm.order_type==='catalog' && !wForm.template_id)">
+                <span v-if="triageLoading">⏳ Wysyłanie...</span>
+                <span v-else>Wyślij do Triage →</span>
               </button>
             </div>
           </div>
@@ -741,6 +745,64 @@
 
     </main><!-- /main -->
 
+    <!-- ═══ MODAL: Szczegóły zlecenia ════════════════════════════════════ -->
+    <div v-if="detailsModal.show" style="position:fixed;inset:0;background:rgba(0,0,0,.5);display:flex;align-items:center;justify-content:center;z-index:100"
+         @click.self="detailsModal.show=false">
+      <div class="card" style="width:520px;max-height:90vh;overflow-y:auto">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px">
+          <h2 style="margin:0">Zlecenie #{{ detailsModal.order?.order_number }}</h2>
+          <button class="btn btn-outline btn-sm" @click="detailsModal.show=false">✕</button>
+        </div>
+        <template v-if="detailsModal.order">
+          <div v-if="detailsModal.order.is_defence"
+               style="background:#fff0f0;border:1px solid var(--rcm-red);border-radius:var(--radius);padding:8px 12px;margin-bottom:12px;color:var(--rcm-red);font-weight:700;font-size:.85rem">
+            🛡 PROJEKT ZBROJENIOWY / MON — dokumenty poufne
+          </div>
+          <table style="width:100%;border-collapse:collapse;font-size:.9rem">
+            <tr style="border-bottom:1px solid var(--border)">
+              <td style="padding:8px 0;color:var(--muted);width:40%">Klient</td>
+              <td style="padding:8px 0;font-weight:600">{{ detailsModal.order.client }}</td>
+            </tr>
+            <tr style="border-bottom:1px solid var(--border)">
+              <td style="padding:8px 0;color:var(--muted)">Status</td>
+              <td style="padding:8px 0"><span class="badge">{{ detailsModal.order.status }}</span></td>
+            </tr>
+            <tr style="border-bottom:1px solid var(--border)">
+              <td style="padding:8px 0;color:var(--muted)">Wynik triage</td>
+              <td style="padding:8px 0">{{ detailsModal.order.triage_branch || '—' }}</td>
+            </tr>
+            <tr style="border-bottom:1px solid var(--border)">
+              <td style="padding:8px 0;color:var(--muted)">Termin</td>
+              <td style="padding:8px 0">{{ detailsModal.order.deadline ? detailsModal.order.deadline.split('-').reverse().join('.') : '—' }}</td>
+            </tr>
+            <tr style="border-bottom:1px solid var(--border)">
+              <td style="padding:8px 0;color:var(--muted)">Materiał</td>
+              <td style="padding:8px 0">{{ detailsModal.order.material || '—' }}</td>
+            </tr>
+            <tr style="border-bottom:1px solid var(--border)">
+              <td style="padding:8px 0;color:var(--muted)">Typ zlecenia</td>
+              <td style="padding:8px 0">{{ detailsModal.order.order_type || '—' }}</td>
+            </tr>
+            <tr v-if="detailsModal.order.description" style="border-bottom:1px solid var(--border)">
+              <td style="padding:8px 0;color:var(--muted)">Opis</td>
+              <td style="padding:8px 0">{{ detailsModal.order.description }}</td>
+            </tr>
+            <tr v-if="detailsModal.order.notes" style="border-bottom:1px solid var(--border)">
+              <td style="padding:8px 0;color:var(--muted)">Uwagi</td>
+              <td style="padding:8px 0">{{ detailsModal.order.notes }}</td>
+            </tr>
+            <tr v-if="detailsModal.order.estimated_value">
+              <td style="padding:8px 0;color:var(--muted)">Szac. wartość</td>
+              <td style="padding:8px 0;font-weight:700;color:var(--rcm-green)">{{ detailsModal.order.estimated_value }} PLN</td>
+            </tr>
+          </table>
+        </template>
+        <div style="margin-top:16px;text-align:right">
+          <button class="btn btn-outline" @click="detailsModal.show=false">Zamknij</button>
+        </div>
+      </div>
+    </div>
+
     <!-- ═══ MODAL: Wycena ręczna ══════════════════════════════════════════ -->
     <div v-if="quoteModal.show" style="position:fixed;inset:0;background:rgba(0,0,0,.5);display:flex;align-items:center;justify-content:center;z-index:100">
       <div class="card" style="width:440px;max-height:90vh;overflow-y:auto">
@@ -834,8 +896,8 @@
 <script>
 const { createApp, ref, computed, onMounted } = Vue
 
-// ── Adres backendu — zmień jeśli inny IP ──────────────────────────────────
-const API = "http://localhost:8000/api"
+// ── Adres backendu — względna ścieżka działa na dowolnym porcie ───────────
+const API = `${location.origin}/api`
 
 // ── Domyślne PINy (MVP) ──────────────────────────────────────────────────
 const USERS = [
@@ -898,6 +960,8 @@ createApp({
     const analytics   = ref(null)
     const harmonogram = ref([])
     const triageResult = ref(null)
+    const triageError  = ref(null)   // komunikat błędu przy submitcie
+    const triageLoading = ref(false) // spinner na przycisku
     const pytania      = ref([])       // pytania Technologa → Biuro
     const answerDraft  = ref({})       // {param_id: "tekst odpowiedzi"}
     const pendingCount = ref(0)        // licznik dla badge w nav
@@ -917,6 +981,7 @@ createApp({
     })
 
     // Modals
+    const detailsModal = ref({ show:false, order:null })
     const quoteModal = ref({ show:false, order:null, labor_hours:1, material_cost:0, overhead_pct:0.1, margin_pct:0.25 })
     const zaporModal = ref({ show:false, order:null, material_cost:0, hours_estimate:1 })
     const paramsModal = ref({ show:false, order:null, question:"" })
@@ -947,6 +1012,8 @@ createApp({
     function resetWizard() {
       wStep.value = 1
       triageResult.value = null
+      triageError.value  = null
+      triageLoading.value = false
       wForm.value = {
         client: "", deadline: "", material: "", has_drawing: false,
         order_type: "", sop_name: "", purpose: "", notes: "", estimated_value: 0,
@@ -961,7 +1028,16 @@ createApp({
         ...opts,
         body: opts.body ? JSON.stringify(opts.body) : undefined
       })
-      if (!res.ok) { const e = await res.json(); throw new Error(e.detail || "API error") }
+      if (!res.ok) {
+        // Czytaj tekst raz, potem próbuj parsować jako JSON
+        const raw = await res.text().catch(() => "")
+        let msg = `HTTP ${res.status}`
+        try { const e = JSON.parse(raw); msg = e.detail || JSON.stringify(e) }
+        catch { msg = raw || msg }
+        throw new Error(msg)
+      }
+      // 204 No Content — brak body, zwróć null
+      if (res.status === 204) return null
       return res.json()
     }
 
@@ -994,12 +1070,21 @@ createApp({
 
     // ── Wizard submit ─────────────────────────────────────────────────────
     async function submitOrderAndTriage() {
-      // 1. Stwórz zlecenie
-      const order = await api("/orders", { method:"POST", body: wForm.value })
-      // 2. Uruchom Triage Engine
-      const result = await api(`/orders/${order.id}/triage`, { method:"POST" })
-      triageResult.value = result
-      wStep.value = 3
+      triageError.value   = null
+      triageLoading.value = true
+      try {
+        // 1. Stwórz zlecenie
+        const order = await api("/orders", { method:"POST", body: wForm.value })
+        // 2. Uruchom Triage Engine
+        const result = await api(`/orders/${order.id}/triage`, { method:"POST" })
+        triageResult.value = result
+        wStep.value = 3
+      } catch (e) {
+        // Pokaż błąd zamiast cicho tracić klik
+        triageError.value = e.message || "Nieznany błąd — sprawdź konsolę"
+      } finally {
+        triageLoading.value = false
+      }
     }
 
     // ── Oblicz podgląd wyceny ─────────────────────────────────────────────
@@ -1012,8 +1097,7 @@ createApp({
 
     // ── Modal handlers ────────────────────────────────────────────────────
     function openOrder(o) {
-      // TODO: Otworzyć modal szczegółów zlecenia
-      alert(`Zlecenie #${o.order_number || o.id}\nKlient: ${o.client}\nStatus: ${o.status}`)
+      detailsModal.value = { show: true, order: o }
     }
     function openQuoteModal(o) {
       quoteModal.value = { show:true, order:o, labor_hours:1, material_cost:0, overhead_pct:0.1, margin_pct:0.25 }
@@ -1119,9 +1203,9 @@ createApp({
     return {
       apiBase: API,
       currentUser, loginRole, loginPin, loginError,
-      tab, orders, templates, analytics, harmonogram, triageResult,
+      tab, orders, templates, analytics, harmonogram, triageResult, triageError, triageLoading,
       wStep, wForm,
-      quoteModal, zaporModal, paramsModal,
+      detailsModal, quoteModal, zaporModal, paramsModal,
       showNewTemplate, newTemplate,
       sopLibrary, paramQuestions,
       nonstandardOrders, catalogPrice, onTemplateChange,
