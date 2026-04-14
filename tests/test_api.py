@@ -16,6 +16,12 @@ Coverage:
 - Restore template (PATCH /api/templates/{id}/restore)
 - Analytics endpoint (GET /api/analytics)
 - Settings read/update (GET /api/settings, PATCH /api/settings/{key})
+- Structured quote v2 (POST /api/orders/{id}/quote/structured)
+- Status transition: niestandard → quoted → in_production
+- Confirm order (POST /api/orders/{id}/confirm)
+- Confirm guard: 409 on wrong status
+- Save as template (POST /api/orders/{id}/save-as-template)
+- Attachments: list (GET /api/orders/{id}/attachments) — empty
 """
 import sys
 import os
@@ -337,3 +343,170 @@ class TestAnalytics:
         create_order(client)
         resp = client.get("/api/analytics")
         assert resp.json()["total_orders"] == 2
+
+
+# ─── Structured Quote v2 ──────────────────────────────────────────────────────
+
+class TestStructuredQuote:
+    """POST /api/orders/{id}/quote/structured — formula: procesy + mat + waga + spawanie."""
+
+    def _niestandard_order_id(self, client, db_session):
+        """Helper: create an order and triage it to niestandard."""
+        seed_setting(db_session)
+        order_id = create_order(client, has_drawing=False, order_type="remont").json()["id"]
+        client.post(f"/api/orders/{order_id}/triage")
+        return order_id
+
+    def test_structured_quote_returns_201(self, client, db_session):
+        order_id = self._niestandard_order_id(client, db_session)
+        resp = client.post(f"/api/orders/{order_id}/quote/structured", json={
+            "processes": [{"name": "Cięcie", "cost": 150.0}],
+            "material_cost": 500.0,
+            "weight_kg": 20.0,
+            "weight_rate_pln_kg": 15.0,
+            "welding_hours": 3.0,
+            "overhead_pct": 0.10,
+            "margin_pct": 0.25,
+        })
+        assert resp.status_code == 201
+        data = resp.json()
+        assert data["total_net"] > 0
+        assert data["estimate_version"] == "v2"
+
+    def test_structured_quote_formula(self, client, db_session):
+        """Verify the formula: (processes + material + weight*rate + welding*rate) * overhead * margin."""
+        seed_setting(db_session, "labor_rate_pln", "100")
+        order_id = create_order(client, has_drawing=False).json()["id"]
+        client.post(f"/api/orders/{order_id}/triage")
+
+        resp = client.post(f"/api/orders/{order_id}/quote/structured", json={
+            "processes": [{"name": "CNC", "cost": 200.0}],
+            "material_cost": 400.0,
+            "weight_kg": 10.0,
+            "weight_rate_pln_kg": 20.0,         # 10 * 20 = 200
+            "welding_hours": 2.0,                # 2 * 100 = 200
+            "labor_hours": 0.0,
+            "overhead_pct": 0.0,
+            "margin_pct": 0.0,
+        })
+        # base = 200 + 400 + 200 + 200 = 1000, overhead=0, margin=0 → 1000
+        assert resp.json()["total_net"] == 1000.0
+
+    def test_structured_quote_flips_status_to_quoted(self, client, db_session):
+        """After saving structured quote, order.status must become 'quoted'."""
+        order_id = self._niestandard_order_id(client, db_session)
+        client.post(f"/api/orders/{order_id}/quote/structured", json={
+            "processes": [], "material_cost": 100.0, "weight_kg": 0,
+            "weight_rate_pln_kg": 15, "welding_hours": 1,
+        })
+        order = client.get(f"/api/orders/{order_id}").json()
+        assert order["status"] == "quoted"
+
+    def test_structured_quote_upserts(self, client, db_session):
+        """Submitting twice should update the existing quote, not create a second one."""
+        order_id = self._niestandard_order_id(client, db_session)
+        base = {"processes": [], "material_cost": 100.0, "weight_kg": 0,
+                "weight_rate_pln_kg": 15, "welding_hours": 0}
+        client.post(f"/api/orders/{order_id}/quote/structured", json=base)
+        base["material_cost"] = 999.0
+        resp = client.post(f"/api/orders/{order_id}/quote/structured", json=base)
+        assert resp.status_code == 201
+        # GET should return the updated price
+        q = client.get(f"/api/orders/{order_id}/quote").json()
+        assert q["material_cost"] == 999.0
+
+
+# ─── Status transitions ───────────────────────────────────────────────────────
+
+class TestStatusTransitions:
+    """Status machine: niestandard → quoted → in_production."""
+
+    def test_simple_quote_also_flips_to_quoted(self, client, db_session):
+        """Legacy /quote endpoint should also set status=quoted for niestandard orders."""
+        seed_setting(db_session)
+        order_id = create_order(client, has_drawing=False).json()["id"]
+        client.post(f"/api/orders/{order_id}/triage")
+        client.post(f"/api/orders/{order_id}/quote", json={
+            "labor_hours": 2.0, "material_cost": 100.0,
+            "overhead_pct": 0.1, "margin_pct": 0.25,
+        })
+        order = client.get(f"/api/orders/{order_id}").json()
+        assert order["status"] == "quoted"
+
+    def test_confirm_quoted_order(self, client, db_session):
+        """POST /confirm on quoted order → status becomes in_production."""
+        seed_setting(db_session)
+        order_id = create_order(client, has_drawing=False).json()["id"]
+        client.post(f"/api/orders/{order_id}/triage")
+        client.post(f"/api/orders/{order_id}/quote/structured", json={
+            "processes": [], "material_cost": 500.0, "weight_kg": 0,
+            "weight_rate_pln_kg": 15, "welding_hours": 0,
+        })
+        resp = client.post(f"/api/orders/{order_id}/confirm")
+        assert resp.status_code == 200
+        assert resp.json()["status"] == "in_production"
+
+    def test_confirm_rejects_non_quoted_status(self, client, db_session):
+        """POST /confirm on a draft/niestandard order → 409 Conflict."""
+        order_id = create_order(client).json()["id"]
+        resp = client.post(f"/api/orders/{order_id}/confirm")
+        assert resp.status_code == 409
+
+    def test_confirm_not_found(self, client):
+        resp = client.post("/api/orders/9999/confirm")
+        assert resp.status_code == 404
+
+
+# ─── Save as template ─────────────────────────────────────────────────────────
+
+class TestSaveAsTemplate:
+    def test_save_creates_template(self, client, db_session):
+        """POST /save-as-template creates a ProductTemplate from the order+quote."""
+        seed_setting(db_session)
+        order_id = create_order(client, has_drawing=False, material="S355").json()["id"]
+        client.post(f"/api/orders/{order_id}/triage")
+        client.post(f"/api/orders/{order_id}/quote/structured", json={
+            "processes": [{"name": "Spawanie TIG", "cost": 300.0}],
+            "material_cost": 200.0, "weight_kg": 15.0,
+            "weight_rate_pln_kg": 15.0, "welding_hours": 2.0,
+        })
+        resp = client.post(f"/api/orders/{order_id}/save-as-template",
+                           json={"name": "Nowy szablon z zlecenia"})
+        assert resp.status_code == 201
+        tmpl = resp.json()
+        assert tmpl["name"] == "Nowy szablon z zlecenia"
+        assert tmpl["is_active"] is True
+
+    def test_save_template_appears_in_catalog(self, client, db_session):
+        """Template saved from order should appear in GET /api/templates."""
+        seed_setting(db_session)
+        order_id = create_order(client, has_drawing=False).json()["id"]
+        client.post(f"/api/orders/{order_id}/triage")
+        client.post(f"/api/orders/{order_id}/quote/structured", json={
+            "processes": [], "material_cost": 100.0,
+            "weight_kg": 0, "weight_rate_pln_kg": 15, "welding_hours": 0,
+        })
+        client.post(f"/api/orders/{order_id}/save-as-template",
+                    json={"name": "Test katalog"})
+        templates = client.get("/api/templates").json()
+        names = [t["name"] for t in templates]
+        assert "Test katalog" in names
+
+    def test_save_template_not_found(self, client):
+        resp = client.post("/api/orders/9999/save-as-template", json={"name": "X"})
+        assert resp.status_code == 404
+
+
+# ─── Attachments ─────────────────────────────────────────────────────────────
+
+class TestAttachments:
+    def test_list_attachments_empty(self, client, db_session):
+        """GET /attachments on a fresh order should return empty list."""
+        order_id = create_order(client).json()["id"]
+        resp = client.get(f"/api/orders/{order_id}/attachments")
+        assert resp.status_code == 200
+        assert resp.json() == []
+
+    def test_delete_attachment_not_found(self, client):
+        resp = client.delete("/api/attachments/9999")
+        assert resp.status_code == 404

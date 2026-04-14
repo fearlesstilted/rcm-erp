@@ -1,0 +1,20 @@
+# База данных — генерируется через seed.py
+backend/rcm_erp.db
+backend/*.db
+
+# Загруженные файлы (рисунки, документация)
+backend/uploads/
+
+# Python
+__pycache__/
+*.pyc
+*.pyo
+.env
+
+# HANDOFF — локальный документ, не для репо
+HANDOFF.md
+
+# IDE
+.idea/
+.vscode/
+*.swp
