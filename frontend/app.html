@@ -754,46 +754,73 @@
           <button class="btn btn-outline btn-sm" @click="detailsModal.show=false">✕</button>
         </div>
         <template v-if="detailsModal.order">
+          <!-- Flagi specjalne -->
           <div v-if="detailsModal.order.is_defence"
                style="background:#fff0f0;border:1px solid var(--rcm-red);border-radius:var(--radius);padding:8px 12px;margin-bottom:12px;color:var(--rcm-red);font-weight:700;font-size:.85rem">
             🛡 PROJEKT ZBROJENIOWY / MON — dokumenty poufne
           </div>
+
+          <!-- Triage badge — główna informacja -->
+          <div style="display:flex;gap:8px;align-items:center;margin-bottom:16px;flex-wrap:wrap">
+            <span :class="'badge badge-' + (detailsModal.order.triage_branch || detailsModal.order.status)"
+                  style="font-size:.95rem;padding:6px 14px">
+              {{ detailsModal.order.triage_branch === 'odrzut' ? '🚫 ODRZUT'
+               : detailsModal.order.triage_branch === 'standard' ? '✅ STANDARD'
+               : detailsModal.order.triage_branch === 'niestandard' ? '⚠️ NIESTANDARD'
+               : detailsModal.order.status?.toUpperCase() }}
+            </span>
+            <span v-if="detailsModal.order.requires_visit"
+                  style="background:#fff3cd;color:#856404;border-radius:4px;padding:4px 10px;font-size:.8rem;font-weight:600">
+              📍 Wymaga wizyty u klienta
+            </span>
+          </div>
+
           <table style="width:100%;border-collapse:collapse;font-size:.9rem">
             <tr style="border-bottom:1px solid var(--border)">
-              <td style="padding:8px 0;color:var(--muted);width:40%">Klient</td>
+              <td style="padding:8px 0;color:var(--muted);width:38%">Klient</td>
               <td style="padding:8px 0;font-weight:600">{{ detailsModal.order.client }}</td>
             </tr>
             <tr style="border-bottom:1px solid var(--border)">
-              <td style="padding:8px 0;color:var(--muted)">Status</td>
-              <td style="padding:8px 0"><span class="badge">{{ detailsModal.order.status }}</span></td>
-            </tr>
-            <tr style="border-bottom:1px solid var(--border)">
-              <td style="padding:8px 0;color:var(--muted)">Wynik triage</td>
-              <td style="padding:8px 0">{{ detailsModal.order.triage_branch || '—' }}</td>
-            </tr>
-            <tr style="border-bottom:1px solid var(--border)">
-              <td style="padding:8px 0;color:var(--muted)">Termin</td>
-              <td style="padding:8px 0">{{ detailsModal.order.deadline ? detailsModal.order.deadline.split('-').reverse().join('.') : '—' }}</td>
-            </tr>
-            <tr style="border-bottom:1px solid var(--border)">
-              <td style="padding:8px 0;color:var(--muted)">Materiał</td>
-              <td style="padding:8px 0">{{ detailsModal.order.material || '—' }}</td>
+              <td style="padding:8px 0;color:var(--muted)">Termin (graniczny)</td>
+              <td style="padding:8px 0;font-weight:600"
+                  :style="detailsModal.order.deadline < new Date().toISOString().slice(0,10) ? 'color:var(--rcm-red)' : ''">
+                {{ detailsModal.order.deadline ? detailsModal.order.deadline.split('-').reverse().join('.') : '—' }}
+              </td>
             </tr>
             <tr style="border-bottom:1px solid var(--border)">
               <td style="padding:8px 0;color:var(--muted)">Typ zlecenia</td>
-              <td style="padding:8px 0">{{ detailsModal.order.order_type || '—' }}</td>
+              <td style="padding:8px 0">
+                {{ detailsModal.order.order_type === 'remont' ? '🔧 Remont / Naprawa'
+                 : detailsModal.order.order_type === 'catalog' ? '📋 Produkt z katalogu'
+                 : detailsModal.order.order_type === 'nowa_czesc' ? '⚙️ Nowa część / Projekt'
+                 : '—' }}
+              </td>
+            </tr>
+            <tr v-if="detailsModal.order.sop_name" style="border-bottom:1px solid var(--border)">
+              <td style="padding:8px 0;color:var(--muted)">SOP / Szablon</td>
+              <td style="padding:8px 0">{{ detailsModal.order.sop_name }}</td>
+            </tr>
+            <tr v-if="detailsModal.order.material" style="border-bottom:1px solid var(--border)">
+              <td style="padding:8px 0;color:var(--muted)">Materiał</td>
+              <td style="padding:8px 0">{{ detailsModal.order.material }}</td>
             </tr>
             <tr v-if="detailsModal.order.description" style="border-bottom:1px solid var(--border)">
-              <td style="padding:8px 0;color:var(--muted)">Opis</td>
+              <td style="padding:8px 0;color:var(--muted)">Opis problemu</td>
               <td style="padding:8px 0">{{ detailsModal.order.description }}</td>
             </tr>
             <tr v-if="detailsModal.order.notes" style="border-bottom:1px solid var(--border)">
               <td style="padding:8px 0;color:var(--muted)">Uwagi</td>
               <td style="padding:8px 0">{{ detailsModal.order.notes }}</td>
             </tr>
-            <tr v-if="detailsModal.order.estimated_value">
+            <tr v-if="detailsModal.order.estimated_value" style="border-bottom:1px solid var(--border)">
               <td style="padding:8px 0;color:var(--muted)">Szac. wartość</td>
-              <td style="padding:8px 0;font-weight:700;color:var(--rcm-green)">{{ detailsModal.order.estimated_value }} PLN</td>
+              <td style="padding:8px 0;font-weight:700;color:var(--rcm-green);font-size:1.05rem">
+                {{ detailsModal.order.estimated_value }} PLN
+              </td>
+            </tr>
+            <tr v-if="detailsModal.order.quantity && detailsModal.order.order_type==='catalog'">
+              <td style="padding:8px 0;color:var(--muted)">Ilość</td>
+              <td style="padding:8px 0">{{ detailsModal.order.quantity }} szt.</td>
             </tr>
           </table>
         </template>
