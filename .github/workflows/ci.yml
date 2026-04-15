@@ -1,0 +1,29 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install Python dependencies
+        # WeasyPrint requires native GTK/Cairo libs — skip in CI since tests never call PDF endpoints.
+        # The try/except ImportError in pdf_gen.py provides a graceful HTML fallback in production.
+        run: |
+          grep -v 'weasyprint' requirements.txt > /tmp/ci-requirements.txt
+          pip install -r /tmp/ci-requirements.txt pytest httpx
+
+      - name: Run tests
+        run: pytest tests/ -v
