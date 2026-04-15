@@ -6,8 +6,7 @@
 ![Vue.js](https://img.shields.io/badge/Vue.js-3-4FC08D?logo=vuedotjs&logoColor=white)
 ![SQLite](https://img.shields.io/badge/SQLite-MVP-003B57?logo=sqlite&logoColor=white)
 ![Docker](https://img.shields.io/badge/Docker-ready-2496ED?logo=docker&logoColor=white)
-
-> Built in ~1.5 weeks for **RCM Sp. z o.o.** (Gołdap, Poland) — steel fabrication, welding, precast concrete.  
+  
 > Replaces a fully paper-based order process that cost the technologist **~2 hours/day** in manual estimation.
 
 ---
