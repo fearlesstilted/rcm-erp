@@ -3,7 +3,11 @@ SQLAlchemy models — Single Source of Truth dla schematu bazy.
 Używamy SQLite dla MVP. Wszystkie JSONB → JSON w SQLite.
 """
 import enum
-from datetime import datetime
+from datetime import datetime, timezone
+
+def _now():
+    """Zastępuje datetime.utcnow() — timezone-aware UTC (Python 3.12+ safe)."""
+    return datetime.now(timezone.utc).replace(tzinfo=None)  # SQLite nie obsługuje tz
 from sqlalchemy import (
     Column, Integer, String, Text, Boolean, Numeric,
     DateTime, Date, Enum, ForeignKey, JSON, create_engine
@@ -93,7 +97,7 @@ class Order(Base):
     template_id      = Column(Integer, ForeignKey("product_templates.id"))  # Wybrany produkt (catalog)
     quantity         = Column(Integer, default=1)      # Ilość sztuk (catalog)
     is_defence       = Column(Boolean, default=False)  # Projekt zbrojeniowy / MON — czerwona ikona w liście
-    created_at    = Column(DateTime, default=datetime.utcnow)
+    created_at    = Column(DateTime, default=_now)
     created_by_id = Column(Integer, ForeignKey("users.id"))
     assigned_to_id = Column(Integer, ForeignKey("users.id"))  # Technolog przy niestandard
 
@@ -257,7 +261,7 @@ class Quote(Base):
     margin_pct    = Column(Numeric(5, 4))
     is_zapor      = Column(Boolean, default=False)  # Zaporowa marża (Fuck-Off Price)
     pdf_path      = Column(String(500))
-    created_at    = Column(DateTime, default=datetime.utcnow)
+    created_at    = Column(DateTime, default=_now)
 
     # --- Wycena strukturalna v2 (formuła technologa) ---
     # processes_json: [{name: "Cięcie plazmą", cost: 150.0}, ...]
@@ -286,7 +290,7 @@ class OrderAttachment(Base):
     size_bytes  = Column(Integer)
     mime_type   = Column(String(100))
     uploaded_by = Column(String(50))   # "technolog" / "biuro" — rola z PIN
-    uploaded_at = Column(DateTime, default=datetime.utcnow)
+    uploaded_at = Column(DateTime, default=_now)
 
     order = relationship("Order", back_populates="attachments")
 
@@ -322,7 +326,7 @@ class StockMovement(Base):
     item_name   = Column(String(200), nullable=False)    # JAKIE (co)
     qty         = Column(Numeric(10, 3), nullable=False)  # ILE
     unit        = Column(String(20))                      # szt / kg / m
-    moved_at    = Column(DateTime, default=datetime.utcnow)  # KIEDY
+    moved_at    = Column(DateTime, default=_now)  # KIEDY
     product_ref = Column(String(200))                     # WYRÓB (referencja do produktu)
 
 
@@ -354,7 +358,7 @@ class ParameterRequest(Base):
     question_text = Column(Text, nullable=False)   # "Proszę podać markę stali i grubość ścianki"
     answer_text   = Column(Text)                   # odpowiedź Biuro
     status        = Column(Enum(ParamRequestStatus), default=ParamRequestStatus.pending)
-    asked_at      = Column(DateTime, default=datetime.utcnow)
+    asked_at      = Column(DateTime, default=_now)
     answered_at   = Column(DateTime)
 
     order = relationship("Order", back_populates="param_requests")
