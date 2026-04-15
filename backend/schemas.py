@@ -251,6 +251,23 @@ class AttachmentOut(BaseModel):
 # =============================================================================
 # ANALYTICS — Dashboard Dyrektora
 # =============================================================================
+class RevenueMonth(BaseModel):
+    month: str          # "2026-04"
+    orders: int
+    revenue_pln: float
+
+class TopClient(BaseModel):
+    client: str
+    orders: int
+    revenue_pln: float
+
+class OverdueOrder(BaseModel):
+    id: int
+    order_number: str
+    client: str
+    status: str
+    deadline: str
+
 class AnalyticsSummary(BaseModel):
     total_orders:     int
     odrzut_count:     int
@@ -260,3 +277,7 @@ class AnalyticsSummary(BaseModel):
     avg_margin_pct:   Optional[float]
     orders_in_production: int
     orders_done:      int
+    # Rozszerzone dane dla Dyrektora
+    revenue_by_month: List[RevenueMonth] = []
+    top_clients:      List[TopClient] = []
+    overdue_orders:   List[OverdueOrder] = []

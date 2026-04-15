@@ -13,14 +13,17 @@ from sqlalchemy.orm import DeclarativeBase, relationship
 # --- Typy wyliczeniowe (Enums) ---
 
 class OrderStatus(str, enum.Enum):
-    draft        = "draft"
-    triage       = "triage"
-    standard     = "standard"
-    niestandard  = "niestandard"
-    quoted       = "quoted"        # Technolog zapisał wycenę, czeka na akceptację Biura
-    rejected     = "rejected"
-    in_production = "in_production"
-    done         = "done"
+    draft         = "draft"
+    triage        = "triage"
+    standard      = "standard"
+    niestandard   = "niestandard"
+    quoted        = "quoted"         # Technolog zapisał wycenę, czeka na akceptację Biura
+    rejected      = "rejected"
+    in_production = "in_production"  # Biuro zatwierdziło — czeka na start
+    w_trakcie     = "w_trakcie"      # Technolog rozpoczął pracę
+    gotowe        = "gotowe"         # Gotowe do odbioru przez klienta
+    wydane        = "wydane"         # Wydane klientowi — zamknięte
+    done          = "done"           # Zachowane dla wstecznej kompatybilności
 
 class TriageBranch(str, enum.Enum):
     odrzut      = "odrzut"

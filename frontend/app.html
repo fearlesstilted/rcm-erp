@@ -94,8 +94,6 @@
 
   /* ── Tabela ─────────────────────────────────────────────────── */
   table { width: 100%; border-collapse: collapse; font-size: 0.88rem; }
-  th { padding: 10px 12px; text-align: left; background: var(--bg); font-size: 0.78rem;
-       text-transform: uppercase; color: var(--muted); border-bottom: 2px solid var(--border); }
   td { padding: 10px 12px; border-bottom: 1px solid var(--border); }
   tr:hover td { background: #fafbfc; }
 
@@ -104,14 +102,17 @@
     display: inline-block; padding: 2px 8px; border-radius: 12px;
     font-size: 0.75rem; font-weight: 600;
   }
-  .badge-draft       { background: #e0e0e0; color: #555; }
-  .badge-standard    { background: #e8f5e9; color: var(--rcm-green); }
-  .badge-niestandard { background: #fff3e0; color: var(--rcm-warn); }
-  .badge-quoted      { background: #e3f2fd; color: #0d47a1; border: 1px solid #1565c0; }
-  .badge-rejected    { background: #ffebee; color: var(--rcm-red); }
-  .badge-in_production { background: #e3f2fd; color: #1565c0; }
-  .badge-done        { background: #f3e5f5; color: #6a1b9a; }
-  .badge-cancelled   { background: #e0e0e0; color: #999; text-decoration: line-through; }
+  .badge-draft         { background: #e0e0e0; color: #555; }
+  .badge-standard      { background: #e8f5e9; color: var(--rcm-green); }
+  .badge-niestandard   { background: #fff3e0; color: var(--rcm-warn); }
+  .badge-quoted        { background: #e3f2fd; color: #0d47a1; border: 1px solid #1565c0; }
+  .badge-rejected      { background: #ffebee; color: var(--rcm-red); }
+  .badge-in_production { background: #e8eaf6; color: #283593; }
+  .badge-w_trakcie     { background: #e8f5e9; color: #1b5e20; border: 1px solid #388e3c; }
+  .badge-gotowe        { background: #e0f7fa; color: #006064; border: 1px solid #0097a7; }
+  .badge-wydane        { background: #f3e5f5; color: #6a1b9a; }
+  .badge-done          { background: #ede7f6; color: #4527a0; }
+  .badge-cancelled     { background: #e0e0e0; color: #999; text-decoration: line-through; }
 
   /* ── Wizard steps ───────────────────────────────────────────── */
   .steps { display: flex; gap: 0; margin-bottom: 20px; }
@@ -123,12 +124,42 @@
   .step.active { color: var(--rcm-blue); border-bottom-color: var(--rcm-blue); }
   .step.done   { color: var(--rcm-green); border-bottom-color: var(--rcm-green); }
 
+  /* ── Sticky header ──────────────────────────────────────────── */
+  header { position: sticky; top: 0; z-index: 100; }
+
+  /* ── Table polish ───────────────────────────────────────────── */
+  th { padding: 10px 12px; text-align: left; background: var(--rcm-blue); color: #fff;
+       font-size: 0.78rem; text-transform: uppercase; letter-spacing: 0.04em; }
+
+  /* ── Field hint ─────────────────────────────────────────────── */
+  .field-hint { font-size: 0.75rem; color: var(--muted); margin-top: 3px; font-style: italic; }
+
+  /* ── Mini dashboard (Biuro/Technolog) ──────────────────────── */
+  .mini-dash { display: flex; gap: 10px; flex-wrap: wrap; margin-bottom: 14px; }
+  .mini-stat {
+    flex: 1; min-width: 120px; background: var(--card); border: 1px solid var(--border);
+    border-radius: var(--radius); padding: 10px 14px; border-left: 4px solid var(--rcm-blue);
+  }
+  .mini-stat.warn  { border-left-color: var(--rcm-warn); }
+  .mini-stat.green { border-left-color: var(--rcm-green); }
+  .mini-stat.red   { border-left-color: var(--rcm-red); }
+  .mini-stat .n  { font-size: 1.6rem; font-weight: 800; color: var(--rcm-blue); }
+  .mini-stat.warn  .n { color: var(--rcm-warn); }
+  .mini-stat.green .n { color: var(--rcm-green); }
+  .mini-stat.red   .n { color: var(--rcm-red); }
+  .mini-stat .t  { font-size: 0.75rem; color: var(--muted); margin-top: 2px; }
+
   /* ── Analytics cards ────────────────────────────────────────── */
   .stat-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); gap: 12px; }
   .stat-card {
     background: var(--card); border: 1px solid var(--border);
     border-radius: var(--radius); padding: 16px; text-align: center;
+    border-top: 3px solid var(--rcm-blue);
   }
+  .stat-card.accent-green  { border-top-color: var(--rcm-green); }
+  .stat-card.accent-red    { border-top-color: var(--rcm-red); }
+  .stat-card.accent-warn   { border-top-color: var(--rcm-warn); }
+  .stat-card.accent-purple { border-top-color: #6a1b9a; }
   .stat-card .num { font-size: 2rem; font-weight: 800; color: var(--rcm-blue); }
   .stat-card .lbl { font-size: 0.78rem; color: var(--muted); margin-top: 4px; }
 
@@ -322,6 +353,7 @@
                   <label>Szacowana wartość (PLN)</label>
                   <input type="number" v-model.number="wForm.estimated_value"
                          min="0" step="100" placeholder="np. 1500">
+                  <small class="field-hint">Nie wiesz? Zostaw 0 — technolog wyliczy dokładną cenę.</small>
                 </div>
               </div>
 
@@ -437,6 +469,25 @@
 
       <!-- ── LISTA ZLECEŃ ─────────────────────────────────────────────── -->
       <div v-if="tab==='orders'">
+        <!-- Mini-dashboard dla Biuro -->
+        <div v-if="currentUser.role==='biuro'" class="mini-dash">
+          <div class="mini-stat">
+            <div class="n">{{ orders.filter(o=>['draft','niestandard'].includes(o.status)).length }}</div>
+            <div class="t">Nowe / W kolejce</div>
+          </div>
+          <div class="mini-stat warn">
+            <div class="n">{{ orders.filter(o=>o.status==='quoted').length }}</div>
+            <div class="t">Do zatwierdzenia</div>
+          </div>
+          <div class="mini-stat green">
+            <div class="n">{{ orders.filter(o=>['in_production','w_trakcie'].includes(o.status)).length }}</div>
+            <div class="t">W realizacji</div>
+          </div>
+          <div class="mini-stat red">
+            <div class="n">{{ orders.filter(o=>o.status==='gotowe').length }}</div>
+            <div class="t">Gotowe do wydania</div>
+          </div>
+        </div>
         <div class="card">
           <h2>Lista zleceń</h2>
           <table>
@@ -472,6 +523,12 @@
                           title="Zatwierdź wycenę Technologa — zlecenie trafi do produkcji">
                     ✅ Zatwierdź
                   </button>
+                  <!-- Biuro wydaje gotowe zlecenie klientowi → wydane -->
+                  <button v-if="o.status==='gotowe' && currentUser.role==='biuro'"
+                          class="btn btn-primary btn-sm" @click="deliverOrder(o)"
+                          title="Oznacz jako wydane klientowi — zlecenie zostanie zamknięte">
+                    📦 Wydano
+                  </button>
                   <a :href="apiBase+'/orders/'+o.id+'/oferta'" target="_blank"
                      class="btn btn-accent btn-sm" style="text-decoration:none"
                      title="PDF dla klienta — z ceną, bez SOP">
@@ -496,6 +553,25 @@
 
       <!-- ── KOLEJKA TECHNOLOGA (Niestandard) ─────────────────────────── -->
       <div v-if="tab==='queue'">
+        <!-- Mini-dashboard dla Technologa -->
+        <div class="mini-dash">
+          <div class="mini-stat warn">
+            <div class="n">{{ orders.filter(o=>o.triage_branch==='niestandard'&&o.status==='niestandard').length }}</div>
+            <div class="t">Do wyceny</div>
+          </div>
+          <div class="mini-stat">
+            <div class="n">{{ orders.filter(o=>o.status==='in_production').length }}</div>
+            <div class="t">Czeka na start</div>
+          </div>
+          <div class="mini-stat green">
+            <div class="n">{{ orders.filter(o=>o.status==='w_trakcie').length }}</div>
+            <div class="t">W trakcie pracy</div>
+          </div>
+          <div class="mini-stat red">
+            <div class="n">{{ orders.filter(o=>o.status==='gotowe').length }}</div>
+            <div class="t">Gotowe do odbioru</div>
+          </div>
+        </div>
         <div class="card">
           <h2>Kolejka — Niestandard</h2>
           <table>
@@ -522,14 +598,30 @@
                     <span v-else style="color:var(--muted);font-size:0.82rem">—</span>
                   </td>
                   <td style="display:flex;gap:6px;flex-wrap:wrap">
-                    <button class="btn btn-outline btn-sm" @click="toggleParams(o.id)">
-                      {{ expandedParams===o.id ? '▲ Ukryj' : '▼ Odpowiedzi' }}
+                    <!-- Przyciski zależne od statusu -->
+                    <template v-if="['niestandard','quoted'].includes(o.status)">
+                      <button class="btn btn-outline btn-sm" @click="toggleParams(o.id)">
+                        {{ expandedParams===o.id ? '▲ Ukryj' : '▼ Odpowiedzi' }}
+                      </button>
+                      <button class="btn btn-accent btn-sm" @click="openZaporModal(o)" title="Wyceń zaporowo (×3-4.5)">Zaporowa</button>
+                      <button class="btn btn-primary btn-sm" @click="openQuoteModal(o)" title="Otwórz formularz wyceny">Wycena</button>
+                      <button class="btn btn-outline btn-sm" @click="openParamsModal(o)" title="Wyślij pytanie do Biuro">Zapytaj ⭢</button>
+                    </template>
+                    <!-- Technolog rozpoczyna pracę (po zatwierdzeniu przez Biuro) -->
+                    <button v-if="o.status==='in_production'"
+                            class="btn btn-success btn-sm" @click="startOrder(o)"
+                            title="Rozpocznij pracę nad zleceniem">
+                      ▶ Rozpocznij pracę
                     </button>
-                    <button class="btn btn-accent btn-sm" @click="openZaporModal(o)">Zaporowa</button>
-                    <button class="btn btn-primary btn-sm" @click="openQuoteModal(o)">Wycena</button>
-                    <button class="btn btn-outline btn-sm" @click="openParamsModal(o)">Zapytaj ⭢</button>
+                    <!-- Technolog kończy pracę → gotowe do odbioru -->
+                    <button v-if="o.status==='w_trakcie'"
+                            class="btn btn-primary btn-sm" @click="completeOrder(o)"
+                            title="Oznacz jako gotowe do odbioru przez klienta">
+                      ✅ Gotowe do odbioru
+                    </button>
                     <a :href="apiBase+'/orders/'+o.id+'/pdf'" target="_blank"
-                       class="btn btn-success btn-sm" style="text-decoration:none">
+                       class="btn btn-outline btn-sm" style="text-decoration:none"
+                       title="Arkusz produkcyjny (bez cen)">
                       ⬇ PDF
                     </a>
                   </td>
@@ -690,37 +782,110 @@
 
       <!-- ── ANALYTICS (Dyrektor) ──────────────────────────────────────── -->
       <div v-if="tab==='analytics'">
+        <!-- Toolbar: odśwież + eksport -->
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px">
+          <h2 style="font-size:1rem;font-weight:700;color:var(--rcm-blue)">Dashboard Dyrektora</h2>
+          <div style="display:flex;gap:8px">
+            <button class="btn btn-outline btn-sm" @click="loadAnalytics()" title="Odśwież dane">🔄 Odśwież</button>
+            <a :href="apiBase+'/export/xlsx'" class="btn btn-success btn-sm" style="text-decoration:none"
+               title="Pobierz wszystkie zlecenia jako plik Excel">
+              📥 Pobierz XLSX
+            </a>
+          </div>
+        </div>
+
+        <!-- Kafelki KPI -->
         <div class="stat-grid" style="margin-bottom:16px" v-if="analytics">
           <div class="stat-card">
             <div class="num">{{ analytics.total_orders }}</div>
             <div class="lbl">Łącznie zleceń</div>
           </div>
-          <div class="stat-card">
+          <div class="stat-card accent-red">
             <div class="num" style="color:var(--rcm-red)">{{ analytics.odrzut_count }}</div>
             <div class="lbl">Odrzuty ({{ analytics.odrzut_pct }}%)</div>
           </div>
-          <div class="stat-card">
+          <div class="stat-card accent-green">
             <div class="num" style="color:var(--rcm-green)">{{ analytics.standard_count }}</div>
             <div class="lbl">Standard</div>
           </div>
-          <div class="stat-card">
+          <div class="stat-card accent-warn">
             <div class="num" style="color:var(--rcm-warn)">{{ analytics.niestandard_count }}</div>
             <div class="lbl">Niestandard</div>
           </div>
           <div class="stat-card">
             <div class="num" style="color:#1565c0">{{ analytics.orders_in_production }}</div>
-            <div class="lbl">W produkcji</div>
+            <div class="lbl">W realizacji</div>
           </div>
-          <div class="stat-card">
+          <div class="stat-card accent-purple">
             <div class="num" style="color:#6a1b9a">{{ analytics.orders_done }}</div>
             <div class="lbl">Zakończone</div>
           </div>
         </div>
-        <div class="card" v-if="analytics?.avg_margin_pct">
-          <h2>Średnia marża</h2>
-          <p style="font-size:2rem;font-weight:800;color:var(--rcm-blue)">
-            {{ analytics.avg_margin_pct }}%
-          </p>
+
+        <!-- Prosty dwukolumnowy layout: marża + przeterminowane -->
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:16px" v-if="analytics">
+          <div class="card" v-if="analytics.avg_margin_pct">
+            <h2>Średnia marża</h2>
+            <p style="font-size:2rem;font-weight:800;color:var(--rcm-blue)">{{ analytics.avg_margin_pct }}%</p>
+          </div>
+          <!-- Przeterminowane zlecenia -->
+          <div class="card" :style="analytics.overdue_orders?.length ? 'border-top:3px solid var(--rcm-red)' : ''">
+            <h2>⚠ Przeterminowane ({{ analytics.overdue_orders?.length || 0 }})</h2>
+            <div v-if="!analytics.overdue_orders?.length" style="color:var(--muted);font-size:0.85rem">
+              Brak przeterminowanych ✓
+            </div>
+            <table v-else style="font-size:0.82rem;margin-top:8px">
+              <thead><tr><th>Nr</th><th>Klient</th><th>Status</th><th>Termin</th></tr></thead>
+              <tbody>
+                <tr v-for="o in analytics.overdue_orders" :key="o.id"
+                    style="color:var(--rcm-red)">
+                  <td>{{ o.order_number }}</td>
+                  <td>{{ o.client }}</td>
+                  <td><span :class="'badge badge-'+o.status">{{ o.status }}</span></td>
+                  <td style="font-weight:700">{{ o.deadline }}</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+        <!-- Przychód za ostatnie 6 miesięcy -->
+        <div class="card" v-if="analytics?.revenue_by_month?.length" style="margin-bottom:16px">
+          <h2>Przychód — ostatnie 6 miesięcy</h2>
+          <table style="margin-top:8px">
+            <thead><tr><th>Miesiąc</th><th>Zlecenia</th><th>Przychód netto (PLN)</th></tr></thead>
+            <tbody>
+              <tr v-for="r in analytics.revenue_by_month" :key="r.month">
+                <td>{{ r.month }}</td>
+                <td>{{ r.orders }}</td>
+                <td style="font-weight:700;color:var(--rcm-blue)">
+                  {{ r.revenue_pln.toLocaleString('pl-PL', {minimumFractionDigits:2}) }}
+                </td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+        <div class="card" v-else-if="analytics && !analytics.revenue_by_month?.length" style="margin-bottom:16px">
+          <h2>Przychód — ostatnie 6 miesięcy</h2>
+          <p style="color:var(--muted);font-size:0.85rem">Brak zatwierdzonych zleceń z wyceną.</p>
+        </div>
+
+        <!-- Top 5 klientów -->
+        <div class="card" v-if="analytics?.top_clients?.length">
+          <h2>Top klientów</h2>
+          <table style="margin-top:8px">
+            <thead><tr><th>#</th><th>Klient</th><th>Zlecenia</th><th>Przychód netto (PLN)</th></tr></thead>
+            <tbody>
+              <tr v-for="(c, i) in analytics.top_clients" :key="c.client">
+                <td style="color:var(--muted);font-weight:700">{{ i+1 }}</td>
+                <td style="font-weight:600">{{ c.client }}</td>
+                <td>{{ c.orders }}</td>
+                <td style="color:var(--rcm-blue);font-weight:700">
+                  {{ c.revenue_pln > 0 ? c.revenue_pln.toLocaleString('pl-PL', {minimumFractionDigits:2}) : '—' }}
+                </td>
+              </tr>
+            </tbody>
+          </table>
         </div>
       </div>
 
@@ -1437,6 +1602,24 @@ createApp({
       await loadOrders()
     }
 
+    async function startOrder(o) {
+      if (!confirm(`Rozpocząć pracę nad zleceniem ${o.order_number} (${o.client})?`)) return
+      await api(`/orders/${o.id}/start`, { method:"POST" })
+      await loadOrders()
+    }
+
+    async function completeOrder(o) {
+      if (!confirm(`Oznaczyć zlecenie ${o.order_number} jako gotowe do odbioru?`)) return
+      await api(`/orders/${o.id}/complete`, { method:"POST" })
+      await loadOrders()
+    }
+
+    async function deliverOrder(o) {
+      if (!confirm(`Potwierdzić wydanie zlecenia ${o.order_number} klientowi ${o.client}?\nZlecenie zostanie zamknięte.`)) return
+      await api(`/orders/${o.id}/deliver`, { method:"POST" })
+      await loadOrders()
+    }
+
     async function saveAsTemplate(order) {
       const name = prompt("Nazwa szablonu SOP:", `${order.sop_name || order.client} — ${order.order_type || 'remont'}`)
       if (!name) return
@@ -1524,11 +1707,11 @@ createApp({
     }
 
     // ── Computed ──────────────────────────────────────────────────────────
-    // Kolejka Technologa — niestandard (w tym quoted, czekające na akceptację Biura)
+    // Kolejka Technologa — wszystkie aktywne niestandard + zlecenia w trakcie realizacji
     const nonstandardOrders = computed(() =>
       orders.value.filter(o =>
         o.triage_branch === "niestandard" &&
-        !["rejected", "cancelled", "in_production", "done"].includes(o.status)
+        !["rejected", "cancelled", "done", "wydane"].includes(o.status)
       )
     )
 
@@ -1576,7 +1759,7 @@ createApp({
       submitOrderAndTriage, calcQuote, calcQuoteStructured,
       openOrder, deleteOrder, openQuoteModal, openZaporModal, openParamsModal,
       submitQuote, submitZapor, submitParamRequest,
-      confirmOrder, saveAsTemplate,
+      confirmOrder, startOrder, completeOrder, deliverOrder, saveAsTemplate,
       addSopBlock, removeSopBlock, saveTemplate,
       isOverdue,
     }
