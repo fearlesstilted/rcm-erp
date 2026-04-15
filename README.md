@@ -222,17 +222,6 @@ docker-compose up --build
 
 ---
 
-## Open Issues
-
-| # | Priority | Description |
-|---|----------|-------------|
-| [#1](https://github.com/fearlesstilted/rcm-erp/issues/1) | 🔥 High | Edit order details from Szczegóły modal — `PATCH /api/orders/{id}` |
-| [#4](https://github.com/fearlesstilted/rcm-erp/issues/4) | High | In-progress status badge + transition button in technologist queue |
-| [#2](https://github.com/fearlesstilted/rcm-erp/issues/2) | Low | Replace deprecated `datetime.utcnow()` — Python 3.12+ warning |
-| [#3](https://github.com/fearlesstilted/rcm-erp/issues/3) | Low | Replace legacy `Query.get()` → `Session.get()` in SQLAlchemy 2.0 |
-
----
-
 ## Estimated Business Impact
 
 Replacing a fully manual process at a steel fabrication shop:
@@ -244,5 +233,3 @@ Replacing a fully manual process at a steel fabrication shop:
 | Pricing errors (5–15% margin loss) | frequent | near-zero | ~15 000 PLN |
 | **Total** | | | **~33 000 PLN/year** |
 
-Development time: ~1.5 weeks (solo).  
-Comparable commercial ERP (SAP, EPICOR): 50 000–200 000 EUR.
