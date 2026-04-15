@@ -5,168 +5,377 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>RCM ERP</title>
 <script src="https://unpkg.com/vue@3/dist/vue.global.prod.js"></script>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&family=DM+Sans:ital,wght@0,400;0,500;0,600;0,700;1,400&family=Outfit:wght@700;800;900&display=swap" rel="stylesheet">
 <style>
   /* ── Reset & zmienne ────────────────────────────────────────── */
   *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
   :root {
-    --rcm-blue:   #1a3a5c;
-    --rcm-accent: #e8891a;
-    --rcm-green:  #2e7d32;
-    --rcm-red:    #c62828;
-    --rcm-warn:   #f57f17;
-    --bg:         #f4f6f8;
-    --card:       #ffffff;
-    --border:     #dde1e6;
-    --text:       #1a1a2e;
-    --muted:      #6b7280;
-    --radius:     8px;
+    --rcm-blue:    #0f2340;
+    --rcm-blue-2:  #1e3f6f;
+    --rcm-accent:  #e07b0f;
+    --rcm-green:   #16a34a;
+    --rcm-red:     #dc2626;
+    --rcm-warn:    #d97706;
+    --bg:          #f0f3f9;
+    --card:        #ffffff;
+    --border:      #e4e9f0;
+    --text:        #0f1923;
+    --muted:       #64748b;
+    --radius:      10px;
+    --sh-sm:  0 1px 3px rgba(0,0,0,0.07), 0 0 0 1px rgba(0,0,0,0.03);
+    --sh-md:  0 4px 16px rgba(0,0,0,0.08), 0 0 0 1px rgba(0,0,0,0.03);
+    --sh-lg:  0 12px 40px rgba(0,0,0,0.16), 0 0 0 1px rgba(0,0,0,0.04);
   }
-  body { font-family: system-ui, sans-serif; background: var(--bg); color: var(--text); }
+  body {
+    font-family: 'DM Sans', system-ui, sans-serif;
+    background: var(--bg); color: var(--text);
+    -webkit-font-smoothing: antialiased;
+    line-height: 1.55;
+  }
+
+  /* ── Login ───────────────────────────────────────────────────── */
+  .login-bg {
+    min-height: 100vh;
+    background: linear-gradient(150deg, #0a1628 0%, #0f2340 45%, #1b3a68 100%);
+    display: flex; align-items: center; justify-content: center; padding: 20px;
+  }
+  .login-card {
+    background: #fff; border-radius: 16px;
+    box-shadow: 0 32px 80px rgba(0,0,0,0.4), 0 0 0 1px rgba(255,255,255,0.05);
+    width: 100%; max-width: 380px; padding: 44px 40px;
+  }
+  .login-logo { display: flex; align-items: center; gap: 14px; margin-bottom: 36px; }
+  .login-logo-mark {
+    width: 46px; height: 46px; border-radius: 12px;
+    background: var(--rcm-blue); color: #fff;
+    display: flex; align-items: center; justify-content: center;
+    font-family: 'Outfit', sans-serif; font-weight: 900; font-size: 1.5rem;
+    flex-shrink: 0;
+  }
+  .login-brand {
+    font-family: 'Outfit', sans-serif; font-weight: 900; font-size: 1.25rem;
+    color: var(--text); line-height: 1.1;
+  }
+  .login-sub { font-size: 0.76rem; color: var(--muted); margin-top: 2px; }
+  .login-divider {
+    border: none; border-top: 1px solid var(--border); margin: 24px 0;
+  }
 
   /* ── Layout ─────────────────────────────────────────────────── */
   header {
     background: var(--rcm-blue); color: #fff;
-    padding: 12px 24px; display: flex; align-items: center; gap: 16px;
+    padding: 0 28px; height: 54px;
+    display: flex; align-items: center; gap: 14px;
+    position: sticky; top: 0; z-index: 100;
+    box-shadow: 0 2px 12px rgba(0,0,0,0.25);
   }
-  header h1 { font-size: 1.2rem; font-weight: 700; }
+  .header-logo-mark {
+    width: 30px; height: 30px; border-radius: 7px;
+    background: var(--rcm-accent);
+    display: flex; align-items: center; justify-content: center;
+    font-family: 'Outfit', sans-serif; font-weight: 900; font-size: 1rem;
+    flex-shrink: 0; color: #fff;
+  }
+  header h1 {
+    font-family: 'Outfit', sans-serif; font-weight: 800;
+    font-size: 1.05rem; letter-spacing: -0.01em;
+  }
   header .role-badge {
-    margin-left: auto; background: var(--rcm-accent);
-    padding: 4px 12px; border-radius: 20px; font-size: 0.85rem; font-weight: 600;
+    margin-left: auto;
+    background: rgba(255,255,255,0.12);
+    border: 1px solid rgba(255,255,255,0.18);
+    padding: 4px 14px; border-radius: 20px;
+    font-size: 0.8rem; font-weight: 600;
   }
+
   nav {
     background: #fff; border-bottom: 1px solid var(--border);
-    display: flex; gap: 0; overflow-x: auto;
+    padding: 0 20px; display: flex; gap: 2px; overflow-x: auto;
+    position: sticky; top: 54px; z-index: 99;
+    box-shadow: 0 1px 4px rgba(0,0,0,0.05);
   }
   nav button {
-    padding: 12px 20px; border: none; background: none;
-    cursor: pointer; font-size: 0.9rem; color: var(--muted);
-    border-bottom: 3px solid transparent; transition: all 0.2s;
-    white-space: nowrap;
+    padding: 0 16px; height: 46px; border: none; background: transparent;
+    cursor: pointer; font-size: 0.875rem; font-family: inherit; font-weight: 500;
+    color: var(--muted); border-bottom: 2.5px solid transparent;
+    transition: all 0.15s ease; white-space: nowrap; display: flex; align-items: center; gap: 6px;
   }
-  nav button.active { color: var(--rcm-blue); border-bottom-color: var(--rcm-blue); font-weight: 600; }
-  nav button:hover:not(.active) { background: var(--bg); }
+  nav button.active {
+    color: var(--rcm-blue); border-bottom-color: var(--rcm-accent); font-weight: 700;
+  }
+  nav button:hover:not(.active) { color: var(--text); background: var(--bg); }
 
-  main { max-width: 960px; margin: 24px auto; padding: 0 16px; }
+  main { max-width: 980px; margin: 28px auto; padding: 0 20px; }
 
   /* ── Karty ──────────────────────────────────────────────────── */
   .card {
-    background: var(--card); border: 1px solid var(--border);
-    border-radius: var(--radius); padding: 20px; margin-bottom: 16px;
+    background: var(--card); border-radius: var(--radius);
+    box-shadow: var(--sh-sm); padding: 24px; margin-bottom: 18px;
   }
-  .card h2 { font-size: 1rem; font-weight: 700; margin-bottom: 16px; color: var(--rcm-blue); }
+  .card h2 {
+    font-family: 'Outfit', sans-serif; font-weight: 800; font-size: 0.9rem;
+    margin-bottom: 20px; color: var(--rcm-blue);
+    text-transform: uppercase; letter-spacing: 0.08em;
+    display: flex; align-items: center; gap: 8px;
+  }
+  .card h2::before {
+    content: ''; display: block; width: 3px; height: 14px;
+    background: var(--rcm-accent); border-radius: 2px; flex-shrink: 0;
+  }
 
   /* ── Formularze ─────────────────────────────────────────────── */
-  .form-row { display: flex; gap: 12px; flex-wrap: wrap; margin-bottom: 12px; }
-  .form-group { display: flex; flex-direction: column; gap: 4px; flex: 1; min-width: 180px; }
-  label { font-size: 0.82rem; font-weight: 600; color: var(--muted); text-transform: uppercase; }
-  input, select, textarea {
-    border: 1px solid var(--border); border-radius: var(--radius);
-    padding: 8px 12px; font-size: 0.9rem; font-family: inherit;
-    transition: border-color 0.2s;
+  .form-row { display: flex; gap: 14px; flex-wrap: wrap; margin-bottom: 14px; }
+  .form-group { display: flex; flex-direction: column; gap: 5px; flex: 1; min-width: 180px; }
+  label {
+    font-size: 0.74rem; font-weight: 700; color: var(--muted);
+    text-transform: uppercase; letter-spacing: 0.06em;
   }
-  input:focus, select:focus, textarea:focus { outline: none; border-color: var(--rcm-blue); }
+  input, select, textarea {
+    border: 1.5px solid var(--border); border-radius: 7px;
+    padding: 9px 12px; font-size: 0.9rem; font-family: inherit;
+    background: #fff; color: var(--text);
+    transition: border-color 0.15s, box-shadow 0.15s;
+  }
+  input:focus, select:focus, textarea:focus {
+    outline: none; border-color: var(--rcm-blue-2);
+    box-shadow: 0 0 0 3px rgba(30,63,111,0.1);
+  }
   textarea { resize: vertical; min-height: 80px; }
 
   /* ── Przyciski ──────────────────────────────────────────────── */
   .btn {
     display: inline-flex; align-items: center; gap: 6px;
-    padding: 9px 18px; border-radius: var(--radius); border: none;
-    font-size: 0.9rem; font-weight: 600; cursor: pointer; transition: opacity 0.2s;
+    padding: 9px 18px; border-radius: 8px; border: none;
+    font-size: 0.875rem; font-weight: 600; font-family: inherit;
+    cursor: pointer; transition: all 0.15s ease; white-space: nowrap;
+    letter-spacing: 0.01em;
   }
-  .btn:hover { opacity: 0.88; }
-  .btn:disabled { opacity: 0.4; cursor: not-allowed; }
-  .btn-primary  { background: var(--rcm-blue);   color: #fff; }
-  .btn-accent   { background: var(--rcm-accent);  color: #fff; }
-  .btn-danger   { background: var(--rcm-red);     color: #fff; }
-  .btn-success  { background: var(--rcm-green);   color: #fff; }
-  .btn-outline  { background: #fff; color: var(--rcm-blue); border: 2px solid var(--rcm-blue); }
-  .btn-sm { padding: 5px 12px; font-size: 0.82rem; }
+  .btn:hover:not(:disabled) { transform: translateY(-1px); }
+  .btn:active:not(:disabled) { transform: translateY(0px); }
+  .btn:disabled { opacity: 0.38; cursor: not-allowed; }
+  .btn-primary { background: var(--rcm-blue); color: #fff; }
+  .btn-primary:hover:not(:disabled) { background: var(--rcm-blue-2); box-shadow: 0 4px 14px rgba(15,35,64,0.4); }
+  .btn-accent  { background: var(--rcm-accent); color: #fff; }
+  .btn-accent:hover:not(:disabled)  { box-shadow: 0 4px 14px rgba(224,123,15,0.4); }
+  .btn-danger  { background: var(--rcm-red); color: #fff; }
+  .btn-danger:hover:not(:disabled)  { box-shadow: 0 4px 12px rgba(220,38,38,0.35); }
+  .btn-success { background: var(--rcm-green); color: #fff; }
+  .btn-success:hover:not(:disabled) { box-shadow: 0 4px 12px rgba(22,163,74,0.35); }
+  .btn-outline {
+    background: transparent; color: var(--rcm-blue);
+    border: 1.5px solid var(--border);
+  }
+  .btn-outline:hover:not(:disabled) { border-color: var(--rcm-blue); background: #f4f7fb; }
+  .btn-sm { padding: 5px 12px; font-size: 0.8rem; border-radius: 6px; }
 
-  /* ── Triage Badge ───────────────────────────────────────────── */
+  /* ── Triage Boxes ───────────────────────────────────────────── */
   .triage-result {
     padding: 16px 20px; border-radius: var(--radius);
-    font-weight: 700; font-size: 1.05rem; margin-top: 12px;
-    display: flex; align-items: center; gap: 10px;
+    font-weight: 600; font-size: 0.95rem; margin-top: 14px;
+    display: flex; align-items: center; gap: 12px;
   }
-  .triage-odrzut     { background: #ffebee; color: var(--rcm-red);   border: 2px solid var(--rcm-red); }
-  .triage-standard   { background: #e8f5e9; color: var(--rcm-green); border: 2px solid var(--rcm-green); }
-  .triage-niestandard { background: #fff3e0; color: var(--rcm-warn); border: 2px solid var(--rcm-warn); }
+  .triage-odrzut      { background: #fef2f2; color: #991b1b; border: 1px solid #fca5a5; }
+  .triage-standard    { background: #f0fdf4; color: #166534; border: 1px solid #86efac; }
+  .triage-niestandard { background: #fffbeb; color: #92400e; border: 1px solid #fcd34d; }
 
   /* ── Tabela ─────────────────────────────────────────────────── */
-  table { width: 100%; border-collapse: collapse; font-size: 0.88rem; }
-  th { padding: 10px 12px; text-align: left; background: var(--bg); font-size: 0.78rem;
-       text-transform: uppercase; color: var(--muted); border-bottom: 2px solid var(--border); }
-  td { padding: 10px 12px; border-bottom: 1px solid var(--border); }
-  tr:hover td { background: #fafbfc; }
+  .table-wrap { border-radius: var(--radius); overflow: hidden; box-shadow: var(--sh-sm); }
+  table { width: 100%; border-collapse: collapse; font-size: 0.875rem; }
+  th {
+    padding: 11px 16px; text-align: left;
+    background: var(--rcm-blue); color: rgba(255,255,255,0.9);
+    font-size: 0.72rem; text-transform: uppercase; letter-spacing: 0.08em; font-weight: 600;
+  }
+  th:first-child { padding-left: 20px; }
+  td { padding: 12px 16px; border-bottom: 1px solid #f1f4f8; background: #fff; }
+  td:first-child { padding-left: 20px; }
+  tbody tr:last-child td { border-bottom: none; }
+  tbody tr:hover td { background: #f8fafd; }
 
   /* ── Status badge ───────────────────────────────────────────── */
   .badge {
-    display: inline-block; padding: 2px 8px; border-radius: 12px;
-    font-size: 0.75rem; font-weight: 600;
+    display: inline-block; padding: 3px 9px; border-radius: 99px;
+    font-size: 0.7rem; font-weight: 700; letter-spacing: 0.04em;
   }
-  .badge-draft       { background: #e0e0e0; color: #555; }
-  .badge-standard    { background: #e8f5e9; color: var(--rcm-green); }
-  .badge-niestandard { background: #fff3e0; color: var(--rcm-warn); }
-  .badge-quoted      { background: #e3f2fd; color: #0d47a1; border: 1px solid #1565c0; }
-  .badge-rejected    { background: #ffebee; color: var(--rcm-red); }
-  .badge-in_production { background: #e3f2fd; color: #1565c0; }
-  .badge-done        { background: #f3e5f5; color: #6a1b9a; }
-  .badge-cancelled   { background: #e0e0e0; color: #999; text-decoration: line-through; }
+  .badge-draft         { background: #f1f5f9; color: #475569; }
+  .badge-standard      { background: #f0fdf4; color: #166534; border: 1px solid #bbf7d0; }
+  .badge-niestandard   { background: #fffbeb; color: #92400e; border: 1px solid #fde68a; }
+  .badge-quoted        { background: #eff6ff; color: #1d4ed8; border: 1px solid #bfdbfe; }
+  .badge-rejected      { background: #fef2f2; color: #991b1b; border: 1px solid #fecaca; }
+  .badge-in_production { background: #eef2ff; color: #3730a3; border: 1px solid #c7d2fe; }
+  .badge-w_trakcie     { background: #f0fdf4; color: #166534; border: 1px solid #86efac; }
+  .badge-gotowe        { background: #ecfeff; color: #164e63; border: 1px solid #a5f3fc; }
+  .badge-wydane        { background: #fdf4ff; color: #6b21a8; border: 1px solid #e9d5ff; }
+  .badge-done          { background: #f5f3ff; color: #4c1d95; border: 1px solid #ddd6fe; }
+  .badge-cancelled     { background: #f1f5f9; color: #94a3b8; text-decoration: line-through; }
 
   /* ── Wizard steps ───────────────────────────────────────────── */
-  .steps { display: flex; gap: 0; margin-bottom: 20px; }
+  .steps { display: flex; margin-bottom: 24px; border-radius: 8px; overflow: hidden; border: 1px solid var(--border); }
   .step {
-    flex: 1; padding: 10px; text-align: center;
-    font-size: 0.82rem; font-weight: 600; color: var(--muted);
-    border-bottom: 3px solid var(--border);
+    flex: 1; padding: 11px 8px; text-align: center;
+    font-size: 0.78rem; font-weight: 600; color: var(--muted);
+    background: #f8f9fb; border-right: 1px solid var(--border);
+    transition: all 0.15s ease;
   }
-  .step.active { color: var(--rcm-blue); border-bottom-color: var(--rcm-blue); }
-  .step.done   { color: var(--rcm-green); border-bottom-color: var(--rcm-green); }
+  .step:last-child { border-right: none; }
+  .step.active { background: var(--rcm-blue); color: #fff; }
+  .step.done   { background: #f0fdf4; color: var(--rcm-green); }
 
-  /* ── Analytics cards ────────────────────────────────────────── */
-  .stat-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); gap: 12px; }
+  /* ── Field hint ─────────────────────────────────────────────── */
+  .field-hint { font-size: 0.73rem; color: var(--muted); margin-top: 4px; }
+
+  /* ── Mini dashboard ─────────────────────────────────────────── */
+  .mini-dash { display: flex; gap: 12px; flex-wrap: wrap; margin-bottom: 20px; }
+  .mini-stat {
+    flex: 1; min-width: 120px; background: var(--card);
+    box-shadow: var(--sh-sm); border-radius: var(--radius);
+    padding: 14px 18px; border-left: 3px solid var(--rcm-blue);
+    transition: box-shadow 0.15s, transform 0.15s;
+  }
+  .mini-stat:hover { box-shadow: var(--sh-md); transform: translateY(-1px); }
+  .mini-stat.warn  { border-left-color: var(--rcm-warn); }
+  .mini-stat.green { border-left-color: var(--rcm-green); }
+  .mini-stat.red   { border-left-color: var(--rcm-red); }
+  .mini-stat .n {
+    font-family: 'DM Mono', monospace; font-size: 2rem; font-weight: 500;
+    color: var(--rcm-blue); line-height: 1; margin-bottom: 4px;
+  }
+  .mini-stat.warn  .n { color: var(--rcm-warn); }
+  .mini-stat.green .n { color: var(--rcm-green); }
+  .mini-stat.red   .n { color: var(--rcm-red); }
+  .mini-stat .t { font-size: 0.72rem; color: var(--muted); font-weight: 500; letter-spacing: 0.02em; }
+
+  /* ── Analytics stat cards ───────────────────────────────────── */
+  .stat-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(155px, 1fr)); gap: 14px; }
   .stat-card {
-    background: var(--card); border: 1px solid var(--border);
-    border-radius: var(--radius); padding: 16px; text-align: center;
+    background: var(--card); box-shadow: var(--sh-sm);
+    border-radius: var(--radius); padding: 20px 18px;
+    text-align: center; border-top: 3px solid var(--rcm-blue);
+    transition: box-shadow 0.15s, transform 0.15s;
   }
-  .stat-card .num { font-size: 2rem; font-weight: 800; color: var(--rcm-blue); }
-  .stat-card .lbl { font-size: 0.78rem; color: var(--muted); margin-top: 4px; }
+  .stat-card:hover { box-shadow: var(--sh-md); transform: translateY(-2px); }
+  .stat-card.accent-green  { border-top-color: var(--rcm-green); }
+  .stat-card.accent-red    { border-top-color: var(--rcm-red); }
+  .stat-card.accent-warn   { border-top-color: var(--rcm-warn); }
+  .stat-card.accent-purple { border-top-color: #7c3aed; }
+  .stat-card .num {
+    font-family: 'DM Mono', monospace; font-size: 2.1rem; font-weight: 500;
+    color: var(--rcm-blue); line-height: 1.1;
+  }
+  .stat-card .lbl { font-size: 0.72rem; color: var(--muted); margin-top: 6px; font-weight: 600; letter-spacing: 0.04em; text-transform: uppercase; }
 
-  /* ── Powiadomienie ──────────────────────────────────────────── */
+  /* ── Param badge ─────────────────────────────────────────────── */
   .param-badge {
     display: inline-flex; gap: 4px; align-items: center;
-    background: #fff3e0; color: var(--rcm-warn);
-    border: 1px solid var(--rcm-warn); border-radius: 12px;
-    padding: 2px 8px; font-size: 0.75rem; font-weight: 600;
+    background: #fffbeb; color: #92400e;
+    border: 1px solid #fde68a; border-radius: 99px;
+    padding: 3px 10px; font-size: 0.73rem; font-weight: 600;
   }
 
   /* ── SOP Builder ─────────────────────────────────────────────── */
-  .sop-blocks { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 12px; }
+  .sop-blocks { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 14px; }
   .sop-block {
-    padding: 6px 12px; background: #e3f2fd; border: 1px solid #1565c0;
-    border-radius: 20px; cursor: pointer; font-size: 0.82rem; transition: all 0.2s;
+    padding: 5px 13px; background: #f0f5ff; border: 1px solid #c7d2fe;
+    border-radius: 99px; cursor: pointer; font-size: 0.82rem;
+    color: var(--rcm-blue-2); font-weight: 600;
+    transition: all 0.15s;
   }
-  .sop-block:hover { background: #1565c0; color: #fff; }
-  .sop-selected {
-    display: flex; flex-direction: column; gap: 6px; margin-top: 8px;
-  }
+  .sop-block:hover { background: var(--rcm-blue); color: #fff; border-color: var(--rcm-blue); }
+  .sop-selected { display: flex; flex-direction: column; gap: 6px; margin-top: 8px; }
   .sop-item {
     display: flex; align-items: center; gap: 8px;
-    padding: 6px 10px; background: var(--bg); border-radius: var(--radius);
-    font-size: 0.85rem;
+    padding: 8px 12px; background: var(--bg); border-radius: 8px; font-size: 0.85rem;
   }
   .sop-item .drag-handle { cursor: grab; color: var(--muted); }
   .sop-num { font-weight: 700; color: var(--rcm-blue); min-width: 20px; }
+
+  /* ── Kompas cenowy (PLN/kg tool) ────────────────────────────── */
+  .kompas-box {
+    background: linear-gradient(135deg, #0f2340 0%, #1e3f6f 100%);
+    border-radius: var(--radius); padding: 16px 20px; margin-bottom: 18px;
+    color: #fff;
+  }
+  .kompas-box label { color: rgba(255,255,255,0.7); }
+  .kompas-box input {
+    background: rgba(255,255,255,0.12); border: 1px solid rgba(255,255,255,0.2);
+    color: #fff; border-radius: 6px;
+  }
+  .kompas-box input::placeholder { color: rgba(255,255,255,0.4); }
+  .kompas-box input:focus {
+    border-color: var(--rcm-accent);
+    box-shadow: 0 0 0 3px rgba(224,123,15,0.25);
+    background: rgba(255,255,255,0.18);
+  }
+  .kompas-result {
+    font-family: 'DM Mono', monospace; font-size: 1.6rem; font-weight: 500;
+    color: var(--rcm-accent); line-height: 1;
+  }
+  .kompas-diff { font-size: 0.8rem; font-weight: 600; margin-top: 3px; }
+  .kompas-diff.ok     { color: #86efac; }
+  .kompas-diff.warn   { color: #fde68a; }
+  .kompas-diff.over   { color: #fca5a5; }
+
+  /* ── Breakdown panel ─────────────────────────────────────────── */
+  .breakdown-panel {
+    background: var(--bg); border: 1px solid var(--border);
+    border-radius: var(--radius); padding: 16px 18px; margin: 14px 0;
+    font-size: 0.875rem;
+  }
+  .breakdown-row {
+    display: flex; justify-content: space-between;
+    padding: 4px 0; color: var(--muted);
+  }
+  .breakdown-row.total {
+    border-top: 1px solid var(--border); margin-top: 8px; padding-top: 10px;
+    font-weight: 700; font-size: 1rem; color: var(--text);
+  }
+  .breakdown-row.total span:last-child { color: var(--rcm-blue); }
+  .breakdown-row.pln-kg {
+    border-top: 1px dashed var(--border); margin-top: 6px; padding-top: 8px;
+    font-size: 0.8rem;
+  }
+
+  /* ── Card-table edge-to-edge ────────────────────────────────── */
+  /* Tables inside cards stretch to edges for a modern SaaS look */
+  .card > table, .card > div > table {
+    margin: 0 -24px -24px; width: calc(100% + 48px);
+    border-radius: 0 0 var(--radius) var(--radius);
+    overflow: hidden;
+  }
+  .card > h2 + table, .card > h2 ~ div > table,
+  .card > h2 + div > table {
+    margin-top: 0;
+  }
+
+  /* ── Section separator ───────────────────────────────────────── */
+  .section-sep {
+    border: none; border-top: 1px solid var(--border);
+    margin: 20px 0;
+  }
+
+  /* ── Scrollbar polish ────────────────────────────────────────── */
+  ::-webkit-scrollbar { width: 6px; height: 6px; }
+  ::-webkit-scrollbar-track { background: transparent; }
+  ::-webkit-scrollbar-thumb { background: #c1c9d6; border-radius: 99px; }
+  ::-webkit-scrollbar-thumb:hover { background: #9aaaba; }
 </style>
 </head>
 <body>
 <div id="app">
 
   <!-- ═══ LOGIN ════════════════════════════════════════════════════════════ -->
-  <div v-if="!currentUser" style="max-width:360px;margin:80px auto;padding:0 16px">
-    <div class="card">
-      <h2 style="text-align:center;margin-bottom:24px">🏭 RCM ERP</h2>
-      <div class="form-group" style="margin-bottom:12px">
+  <div v-if="!currentUser" class="login-bg">
+    <div class="login-card">
+      <div class="login-logo">
+        <div class="login-logo-mark">R</div>
+        <div>
+          <div class="login-brand">RCM ERP</div>
+          <div class="login-sub">System zarządzania zleceniami</div>
+        </div>
+      </div>
+      <div class="form-group" style="margin-bottom:14px">
         <label>Rola</label>
         <select v-model="loginRole">
           <option value="biuro">Biuro</option>
@@ -174,16 +383,20 @@
           <option value="dyrektor">Dyrektor</option>
         </select>
       </div>
-      <div class="form-group" style="margin-bottom:16px">
+      <div class="form-group" style="margin-bottom:20px">
         <label>PIN</label>
-        <input type="password" v-model="loginPin" placeholder="Wpisz PIN" @keyup.enter="login" maxlength="4">
+        <input type="password" v-model="loginPin" placeholder="••••" @keyup.enter="login" maxlength="4"
+               style="font-size:1.4rem;letter-spacing:0.3em;text-align:center">
       </div>
-      <button class="btn btn-primary" style="width:100%" @click="login">Zaloguj</button>
-      <p v-if="loginError" style="color:var(--rcm-red);text-align:center;margin-top:8px;font-size:0.85rem">
-        Błędny PIN
+      <button class="btn btn-primary" style="width:100%;justify-content:center;padding:11px" @click="login">
+        Zaloguj się
+      </button>
+      <p v-if="loginError" style="color:var(--rcm-red);text-align:center;margin-top:10px;font-size:0.85rem;font-weight:600">
+        Błędny PIN — spróbuj ponownie
       </p>
-      <p style="text-align:center;margin-top:12px;font-size:0.75rem;color:var(--muted)">
-        Demo: Biuro=1111 · Technolog=2222 · Dyrektor=3333
+      <hr class="login-divider">
+      <p style="text-align:center;font-size:0.72rem;color:var(--muted);line-height:1.8">
+        Biuro <strong>1111</strong> · Technolog <strong>2222</strong> · Dyrektor <strong>3333</strong>
       </p>
     </div>
   </div>
@@ -191,10 +404,10 @@
   <!-- ═══ GŁÓWNY INTERFEJS ══════════════════════════════════════════════════ -->
   <template v-else>
     <header>
-      <span>🏭</span>
+      <div class="header-logo-mark">R</div>
       <h1>RCM ERP</h1>
       <div class="role-badge">{{ currentUser.name }}</div>
-      <button class="btn btn-sm" style="margin-left:8px;background:#fff;color:var(--rcm-blue);border:none" @click="logout">Wyloguj</button>
+      <button class="btn btn-sm" style="margin-left:8px;background:rgba(255,255,255,0.12);color:#fff;border:1px solid rgba(255,255,255,0.18)" @click="logout">Wyloguj</button>
     </header>
 
     <nav>
@@ -322,6 +535,7 @@
                   <label>Szacowana wartość (PLN)</label>
                   <input type="number" v-model.number="wForm.estimated_value"
                          min="0" step="100" placeholder="np. 1500">
+                  <small class="field-hint">Nie wiesz? Zostaw 0 — technolog wyliczy dokładną cenę.</small>
                 </div>
               </div>
 
@@ -437,6 +651,25 @@
 
       <!-- ── LISTA ZLECEŃ ─────────────────────────────────────────────── -->
       <div v-if="tab==='orders'">
+        <!-- Mini-dashboard dla Biuro -->
+        <div v-if="currentUser.role==='biuro'" class="mini-dash">
+          <div class="mini-stat">
+            <div class="n">{{ orders.filter(o=>['draft','niestandard'].includes(o.status)).length }}</div>
+            <div class="t">Nowe / W kolejce</div>
+          </div>
+          <div class="mini-stat warn">
+            <div class="n">{{ orders.filter(o=>o.status==='quoted').length }}</div>
+            <div class="t">Do zatwierdzenia</div>
+          </div>
+          <div class="mini-stat green">
+            <div class="n">{{ orders.filter(o=>['in_production','w_trakcie'].includes(o.status)).length }}</div>
+            <div class="t">W realizacji</div>
+          </div>
+          <div class="mini-stat red">
+            <div class="n">{{ orders.filter(o=>o.status==='gotowe').length }}</div>
+            <div class="t">Gotowe do wydania</div>
+          </div>
+        </div>
         <div class="card">
           <h2>Lista zleceń</h2>
           <table>
@@ -472,6 +705,12 @@
                           title="Zatwierdź wycenę Technologa — zlecenie trafi do produkcji">
                     ✅ Zatwierdź
                   </button>
+                  <!-- Biuro wydaje gotowe zlecenie klientowi → wydane -->
+                  <button v-if="o.status==='gotowe' && currentUser.role==='biuro'"
+                          class="btn btn-primary btn-sm" @click="deliverOrder(o)"
+                          title="Oznacz jako wydane klientowi — zlecenie zostanie zamknięte">
+                    📦 Wydano
+                  </button>
                   <a :href="apiBase+'/orders/'+o.id+'/oferta'" target="_blank"
                      class="btn btn-accent btn-sm" style="text-decoration:none"
                      title="PDF dla klienta — z ceną, bez SOP">
@@ -496,6 +735,25 @@
 
       <!-- ── KOLEJKA TECHNOLOGA (Niestandard) ─────────────────────────── -->
       <div v-if="tab==='queue'">
+        <!-- Mini-dashboard dla Technologa -->
+        <div class="mini-dash">
+          <div class="mini-stat warn">
+            <div class="n">{{ orders.filter(o=>o.triage_branch==='niestandard'&&o.status==='niestandard').length }}</div>
+            <div class="t">Do wyceny</div>
+          </div>
+          <div class="mini-stat">
+            <div class="n">{{ orders.filter(o=>o.status==='in_production').length }}</div>
+            <div class="t">Czeka na start</div>
+          </div>
+          <div class="mini-stat green">
+            <div class="n">{{ orders.filter(o=>o.status==='w_trakcie').length }}</div>
+            <div class="t">W trakcie pracy</div>
+          </div>
+          <div class="mini-stat red">
+            <div class="n">{{ orders.filter(o=>o.status==='gotowe').length }}</div>
+            <div class="t">Gotowe do odbioru</div>
+          </div>
+        </div>
         <div class="card">
           <h2>Kolejka — Niestandard</h2>
           <table>
@@ -522,14 +780,30 @@
                     <span v-else style="color:var(--muted);font-size:0.82rem">—</span>
                   </td>
                   <td style="display:flex;gap:6px;flex-wrap:wrap">
-                    <button class="btn btn-outline btn-sm" @click="toggleParams(o.id)">
-                      {{ expandedParams===o.id ? '▲ Ukryj' : '▼ Odpowiedzi' }}
+                    <!-- Przyciski zależne od statusu -->
+                    <template v-if="['niestandard','quoted'].includes(o.status)">
+                      <button class="btn btn-outline btn-sm" @click="toggleParams(o.id)">
+                        {{ expandedParams===o.id ? '▲ Ukryj' : '▼ Odpowiedzi' }}
+                      </button>
+                      <button class="btn btn-accent btn-sm" @click="openZaporModal(o)" title="Wyceń zaporowo (×3-4.5)">Zaporowa</button>
+                      <button class="btn btn-primary btn-sm" @click="openQuoteModal(o)" title="Otwórz formularz wyceny">Wycena</button>
+                      <button class="btn btn-outline btn-sm" @click="openParamsModal(o)" title="Wyślij pytanie do Biuro">Zapytaj ⭢</button>
+                    </template>
+                    <!-- Technolog rozpoczyna pracę (po zatwierdzeniu przez Biuro) -->
+                    <button v-if="o.status==='in_production'"
+                            class="btn btn-success btn-sm" @click="startOrder(o)"
+                            title="Rozpocznij pracę nad zleceniem">
+                      ▶ Rozpocznij pracę
                     </button>
-                    <button class="btn btn-accent btn-sm" @click="openZaporModal(o)">Zaporowa</button>
-                    <button class="btn btn-primary btn-sm" @click="openQuoteModal(o)">Wycena</button>
-                    <button class="btn btn-outline btn-sm" @click="openParamsModal(o)">Zapytaj ⭢</button>
+                    <!-- Technolog kończy pracę → gotowe do odbioru -->
+                    <button v-if="o.status==='w_trakcie'"
+                            class="btn btn-primary btn-sm" @click="completeOrder(o)"
+                            title="Oznacz jako gotowe do odbioru przez klienta">
+                      ✅ Gotowe do odbioru
+                    </button>
                     <a :href="apiBase+'/orders/'+o.id+'/pdf'" target="_blank"
-                       class="btn btn-success btn-sm" style="text-decoration:none">
+                       class="btn btn-outline btn-sm" style="text-decoration:none"
+                       title="Arkusz produkcyjny (bez cen)">
                       ⬇ PDF
                     </a>
                   </td>
@@ -690,37 +964,110 @@
 
       <!-- ── ANALYTICS (Dyrektor) ──────────────────────────────────────── -->
       <div v-if="tab==='analytics'">
+        <!-- Toolbar: odśwież + eksport -->
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px">
+          <h2 style="font-size:1rem;font-weight:700;color:var(--rcm-blue)">Dashboard Dyrektora</h2>
+          <div style="display:flex;gap:8px">
+            <button class="btn btn-outline btn-sm" @click="loadAnalytics()" title="Odśwież dane">🔄 Odśwież</button>
+            <a :href="apiBase+'/export/xlsx'" class="btn btn-success btn-sm" style="text-decoration:none"
+               title="Pobierz wszystkie zlecenia jako plik Excel">
+              📥 Pobierz XLSX
+            </a>
+          </div>
+        </div>
+
+        <!-- Kafelki KPI -->
         <div class="stat-grid" style="margin-bottom:16px" v-if="analytics">
           <div class="stat-card">
             <div class="num">{{ analytics.total_orders }}</div>
             <div class="lbl">Łącznie zleceń</div>
           </div>
-          <div class="stat-card">
+          <div class="stat-card accent-red">
             <div class="num" style="color:var(--rcm-red)">{{ analytics.odrzut_count }}</div>
             <div class="lbl">Odrzuty ({{ analytics.odrzut_pct }}%)</div>
           </div>
-          <div class="stat-card">
+          <div class="stat-card accent-green">
             <div class="num" style="color:var(--rcm-green)">{{ analytics.standard_count }}</div>
             <div class="lbl">Standard</div>
           </div>
-          <div class="stat-card">
+          <div class="stat-card accent-warn">
             <div class="num" style="color:var(--rcm-warn)">{{ analytics.niestandard_count }}</div>
             <div class="lbl">Niestandard</div>
           </div>
           <div class="stat-card">
             <div class="num" style="color:#1565c0">{{ analytics.orders_in_production }}</div>
-            <div class="lbl">W produkcji</div>
+            <div class="lbl">W realizacji</div>
           </div>
-          <div class="stat-card">
+          <div class="stat-card accent-purple">
             <div class="num" style="color:#6a1b9a">{{ analytics.orders_done }}</div>
             <div class="lbl">Zakończone</div>
           </div>
         </div>
-        <div class="card" v-if="analytics?.avg_margin_pct">
-          <h2>Średnia marża</h2>
-          <p style="font-size:2rem;font-weight:800;color:var(--rcm-blue)">
-            {{ analytics.avg_margin_pct }}%
-          </p>
+
+        <!-- Prosty dwukolumnowy layout: marża + przeterminowane -->
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:16px" v-if="analytics">
+          <div class="card" v-if="analytics.avg_margin_pct">
+            <h2>Średnia marża</h2>
+            <p style="font-size:2rem;font-weight:800;color:var(--rcm-blue)">{{ analytics.avg_margin_pct }}%</p>
+          </div>
+          <!-- Przeterminowane zlecenia -->
+          <div class="card" :style="analytics.overdue_orders?.length ? 'border-top:3px solid var(--rcm-red)' : ''">
+            <h2>⚠ Przeterminowane ({{ analytics.overdue_orders?.length || 0 }})</h2>
+            <div v-if="!analytics.overdue_orders?.length" style="color:var(--muted);font-size:0.85rem">
+              Brak przeterminowanych ✓
+            </div>
+            <table v-else style="font-size:0.82rem;margin-top:8px">
+              <thead><tr><th>Nr</th><th>Klient</th><th>Status</th><th>Termin</th></tr></thead>
+              <tbody>
+                <tr v-for="o in analytics.overdue_orders" :key="o.id"
+                    style="color:var(--rcm-red)">
+                  <td>{{ o.order_number }}</td>
+                  <td>{{ o.client }}</td>
+                  <td><span :class="'badge badge-'+o.status">{{ o.status }}</span></td>
+                  <td style="font-weight:700">{{ o.deadline }}</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+        <!-- Przychód za ostatnie 6 miesięcy -->
+        <div class="card" v-if="analytics?.revenue_by_month?.length" style="margin-bottom:16px">
+          <h2>Przychód — ostatnie 6 miesięcy</h2>
+          <table style="margin-top:8px">
+            <thead><tr><th>Miesiąc</th><th>Zlecenia</th><th>Przychód netto (PLN)</th></tr></thead>
+            <tbody>
+              <tr v-for="r in analytics.revenue_by_month" :key="r.month">
+                <td>{{ r.month }}</td>
+                <td>{{ r.orders }}</td>
+                <td style="font-weight:700;color:var(--rcm-blue)">
+                  {{ r.revenue_pln.toLocaleString('pl-PL', {minimumFractionDigits:2}) }}
+                </td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+        <div class="card" v-else-if="analytics && !analytics.revenue_by_month?.length" style="margin-bottom:16px">
+          <h2>Przychód — ostatnie 6 miesięcy</h2>
+          <p style="color:var(--muted);font-size:0.85rem">Brak zatwierdzonych zleceń z wyceną.</p>
+        </div>
+
+        <!-- Top 5 klientów -->
+        <div class="card" v-if="analytics?.top_clients?.length">
+          <h2>Top klientów</h2>
+          <table style="margin-top:8px">
+            <thead><tr><th>#</th><th>Klient</th><th>Zlecenia</th><th>Przychód netto (PLN)</th></tr></thead>
+            <tbody>
+              <tr v-for="(c, i) in analytics.top_clients" :key="c.client">
+                <td style="color:var(--muted);font-weight:700">{{ i+1 }}</td>
+                <td style="font-weight:600">{{ c.client }}</td>
+                <td>{{ c.orders }}</td>
+                <td style="color:var(--rcm-blue);font-weight:700">
+                  {{ c.revenue_pln > 0 ? c.revenue_pln.toLocaleString('pl-PL', {minimumFractionDigits:2}) : '—' }}
+                </td>
+              </tr>
+            </tbody>
+          </table>
         </div>
       </div>
 
@@ -902,50 +1249,96 @@
 
         <!-- ── TRYB V2: Formuła Technologa ─────────────────────────────── -->
         <template v-if="quoteModal.mode==='structured'">
+
+          <!-- ▸ KOMPAS CENOWY ──────────────────────────────────────────── -->
+          <div class="kompas-box">
+            <div style="font-size:0.72rem;font-weight:700;letter-spacing:0.08em;text-transform:uppercase;color:rgba(255,255,255,0.5);margin-bottom:10px">
+              ⬡ Kompas cenowy — docelowa stawka wyjściowa
+            </div>
+            <div style="display:flex;gap:12px;align-items:flex-end;flex-wrap:wrap">
+              <div style="flex:1;min-width:120px">
+                <label style="font-size:0.72rem;letter-spacing:0.06em">Waga netto (kg)</label>
+                <input type="number" v-model.number="quoteModal.weight_netto_kg" min="0" step="0.5"
+                       placeholder="0" style="width:100%;margin-top:4px">
+              </div>
+              <div style="flex:1;min-width:120px">
+                <label style="font-size:0.72rem;letter-spacing:0.06em">Docelowa stawka (PLN/kg)</label>
+                <input type="number" v-model.number="quoteModal.target_pln_kg" min="0" step="1"
+                       placeholder="np. 30" style="width:100%;margin-top:4px">
+              </div>
+              <div style="min-width:140px;padding-bottom:2px">
+                <div style="font-size:0.7rem;color:rgba(255,255,255,0.5);margin-bottom:4px;letter-spacing:0.04em">Rekomendowana cena</div>
+                <div class="kompas-result">
+                  {{ quoteModal.weight_netto_kg > 0 && quoteModal.target_pln_kg > 0
+                      ? Math.round(quoteModal.weight_netto_kg * quoteModal.target_pln_kg * (1+(quoteModal.overhead_pct||0)) * (1+(quoteModal.margin_pct||0))).toLocaleString('pl-PL')
+                      : '—' }} PLN
+                </div>
+                <!-- porównanie z bieżącą wyceną -->
+                <template v-if="quoteModal.weight_netto_kg > 0 && quoteModal.target_pln_kg > 0 && calcQuoteStructured() > 0">
+                  <div :class="['kompas-diff',
+                    Math.abs(calcQuoteStructured() - quoteModal.weight_netto_kg*quoteModal.target_pln_kg*(1+(quoteModal.overhead_pct||0))*(1+(quoteModal.margin_pct||0))) /
+                    (quoteModal.weight_netto_kg*quoteModal.target_pln_kg*(1+(quoteModal.overhead_pct||0))*(1+(quoteModal.margin_pct||0))) < 0.1 ? 'ok'
+                    : Math.abs(calcQuoteStructured() - quoteModal.weight_netto_kg*quoteModal.target_pln_kg*(1+(quoteModal.overhead_pct||0))*(1+(quoteModal.margin_pct||0))) /
+                      (quoteModal.weight_netto_kg*quoteModal.target_pln_kg*(1+(quoteModal.overhead_pct||0))*(1+(quoteModal.margin_pct||0))) < 0.25 ? 'warn' : 'over'
+                  ]">
+                    Twoja wycena: {{ calcQuoteStructured() }} PLN
+                    ({{ calcQuoteStructured() > quoteModal.weight_netto_kg*quoteModal.target_pln_kg*(1+(quoteModal.overhead_pct||0))*(1+(quoteModal.margin_pct||0)) ? '+' : '' }}{{ Math.round((calcQuoteStructured()/(quoteModal.weight_netto_kg*quoteModal.target_pln_kg*(1+(quoteModal.overhead_pct||0))*(1+(quoteModal.margin_pct||0)))-1)*100) }}% vs cel)
+                  </div>
+                </template>
+              </div>
+            </div>
+          </div>
+          <!-- waga brutto osobno — mniej ważna -->
+          <div class="form-group" style="margin-bottom:14px;max-width:200px">
+            <label style="color:var(--muted)">Waga brutto (kg)</label>
+            <input type="number" v-model.number="quoteModal.weight_brutto_kg" min="0" step="0.5">
+          </div>
+
+          <!-- ▸ KOSZTY SZCZEGÓŁOWE ──────────────────────────────────────── -->
           <!-- Procesy -->
           <div style="margin-bottom:14px">
-            <label style="font-size:0.82rem;font-weight:600;color:var(--muted);text-transform:uppercase;display:block;margin-bottom:8px">
-              1. Ilość procesów
-            </label>
+            <label style="display:block;margin-bottom:8px">1. Procesy produkcyjne</label>
             <div v-for="(proc, idx) in quoteModal.processes" :key="idx"
                  style="display:flex;gap:8px;margin-bottom:6px;align-items:center">
               <input type="text" v-model="proc.name" placeholder="Nazwa procesu (np. Cięcie plazmą)"
-                     style="flex:2;padding:7px 10px;font-size:0.85rem">
+                     style="flex:2;font-size:0.85rem">
               <input type="number" v-model.number="proc.cost" placeholder="PLN" min="0"
-                     style="flex:1;padding:7px 10px;font-size:0.85rem;max-width:110px">
+                     style="flex:1;font-size:0.85rem;max-width:110px">
               <button @click="quoteModal.processes.splice(idx,1)"
-                      style="border:none;background:none;cursor:pointer;color:var(--rcm-red);font-size:1.1rem;padding:4px">×</button>
+                      style="border:none;background:none;cursor:pointer;color:var(--rcm-red);font-size:1.2rem;padding:4px;line-height:1">×</button>
             </div>
             <button class="btn btn-outline btn-sm" @click="quoteModal.processes.push({name:'',cost:0})">
               + Dodaj proces
             </button>
           </div>
 
-          <!-- Materiał + Waga -->
+          <!-- Materiał + Waga robocza -->
           <div class="form-row">
             <div class="form-group">
               <label>2. Zakup materiału (PLN)</label>
               <input type="number" v-model.number="quoteModal.material_cost" min="0" step="10">
             </div>
             <div class="form-group">
-              <label>3. Waga (kg)</label>
+              <label>3. Waga robocza (kg)</label>
               <input type="number" v-model.number="quoteModal.weight_kg" min="0" step="0.5">
+              <span class="field-hint">Waga dla kalkulacji kosztu materiałowego</span>
             </div>
           </div>
 
-          <!-- Stawka za kg (slider 7-30) -->
+          <!-- Stawka za kg — złożoność -->
           <div style="margin-bottom:14px">
-            <label style="font-size:0.82rem;font-weight:600;color:var(--muted);text-transform:uppercase;display:block;margin-bottom:6px">
-              Stawka za kg — złożoność projektu: <strong>{{ quoteModal.weight_rate_pln_kg }} PLN/kg</strong>
+            <label style="display:block;margin-bottom:6px">
+              Stawka robocza za kg — złożoność:
+              <strong style="color:var(--rcm-blue);font-family:'DM Mono',monospace">{{ quoteModal.weight_rate_pln_kg }} PLN/kg</strong>
             </label>
             <div style="display:flex;align-items:center;gap:10px">
-              <span style="font-size:0.78rem;color:var(--muted)">7 (proste)</span>
+              <span style="font-size:0.75rem;color:var(--muted)">7 (proste)</span>
               <input type="range" v-model.number="quoteModal.weight_rate_pln_kg" min="7" max="30" step="0.5"
-                     style="flex:1;accent-color:var(--rcm-blue)">
-              <span style="font-size:0.78rem;color:var(--muted)">30 (złożone)</span>
+                     style="flex:1;accent-color:var(--rcm-blue);height:4px">
+              <span style="font-size:0.75rem;color:var(--muted)">30 (złożone)</span>
             </div>
-            <div style="font-size:0.8rem;color:var(--muted);margin-top:4px">
-              = {{ Math.round(quoteModal.weight_kg * quoteModal.weight_rate_pln_kg) }} PLN za wagę
+            <div class="field-hint" style="margin-top:6px">
+              = {{ Math.round(quoteModal.weight_kg * quoteModal.weight_rate_pln_kg) }} PLN za wagę roboczą
             </div>
           </div>
 
@@ -954,37 +1347,19 @@
             <div class="form-group">
               <label>4. Czas spawania (godz.)</label>
               <input type="number" v-model.number="quoteModal.welding_hours" min="0" step="0.5">
-              <span style="font-size:0.78rem;color:var(--muted);margin-top:4px">
-                = {{ Math.round(quoteModal.welding_hours * (settings.labor_rate_pln || 90)) }} PLN (stawka {{ settings.labor_rate_pln || 90 }} PLN/h)
-              </span>
+              <span class="field-hint">= {{ Math.round(quoteModal.welding_hours * (settings.labor_rate_pln || 90)) }} PLN @ {{ settings.labor_rate_pln || 90 }} PLN/h</span>
             </div>
             <div class="form-group">
               <label>Robocizna dodatkowa (godz.)</label>
               <input type="number" v-model.number="quoteModal.labor_hours" min="0" step="0.5">
-              <span style="font-size:0.78rem;color:var(--muted);margin-top:4px">
-                Poza spawaniem (obróbka, montaż)
-              </span>
+              <span class="field-hint">Obróbka, montaż poza spawaniem</span>
             </div>
           </div>
 
-          <!-- Waga netto/brutto (informacyjnie) -->
-          <div class="form-row" style="margin-bottom:14px">
-            <div class="form-group">
-              <label style="color:#aaa">5. Waga netto (kg) — info</label>
-              <input type="number" v-model.number="quoteModal.weight_netto_kg" min="0" step="0.5"
-                     style="background:#f8f8f8;color:#888">
-            </div>
-            <div class="form-group">
-              <label style="color:#aaa">Waga brutto (kg) — info</label>
-              <input type="number" v-model.number="quoteModal.weight_brutto_kg" min="0" step="0.5"
-                     style="background:#f8f8f8;color:#888">
-            </div>
-          </div>
-
-          <!-- Overhead i marża -->
+          <!-- Overhead + marża -->
           <div class="form-row">
             <div class="form-group">
-              <label>6. Narzut overhead (%)</label>
+              <label>5. Overhead (%)</label>
               <input type="number" v-model.number="quoteModal.overhead_pct" min="0" max="1" step="0.05">
             </div>
             <div class="form-group">
@@ -993,29 +1368,41 @@
             </div>
           </div>
 
-          <!-- Live breakdown -->
-          <div style="background:var(--bg);padding:14px;border-radius:var(--radius);margin:12px 0;font-size:0.85rem">
-            <div style="display:flex;justify-content:space-between;margin-bottom:4px">
-              <span style="color:var(--muted)">Procesy</span>
+          <!-- ▸ LIVE BREAKDOWN ─────────────────────────────────────────── -->
+          <div class="breakdown-panel">
+            <div class="breakdown-row">
+              <span>Procesy</span>
               <span>{{ Math.round(quoteModal.processes.reduce((s,p)=>s+(+p.cost||0),0)) }} PLN</span>
             </div>
-            <div style="display:flex;justify-content:space-between;margin-bottom:4px">
-              <span style="color:var(--muted)">Materiał</span>
+            <div class="breakdown-row">
+              <span>Materiał</span>
               <span>{{ Math.round(quoteModal.material_cost||0) }} PLN</span>
             </div>
-            <div style="display:flex;justify-content:space-between;margin-bottom:4px">
-              <span style="color:var(--muted)">Waga × stawka</span>
+            <div class="breakdown-row">
+              <span>Waga × stawka</span>
               <span>{{ Math.round((quoteModal.weight_kg||0)*(quoteModal.weight_rate_pln_kg||0)) }} PLN</span>
             </div>
-            <div style="display:flex;justify-content:space-between;margin-bottom:4px">
-              <span style="color:var(--muted)">Spawanie + robocizna</span>
+            <div class="breakdown-row">
+              <span>Spawanie + robocizna</span>
               <span>{{ Math.round(((quoteModal.welding_hours||0)+(quoteModal.labor_hours||0))*(settings.labor_rate_pln||90)) }} PLN</span>
             </div>
-            <hr style="border:none;border-top:1px solid var(--border);margin:8px 0">
-            <div style="display:flex;justify-content:space-between;font-weight:700;font-size:1.05rem">
+            <div class="breakdown-row total">
               <span>Cena netto</span>
-              <span style="color:var(--rcm-blue)">{{ calcQuoteStructured() }} PLN</span>
+              <span>{{ calcQuoteStructured() }} PLN</span>
             </div>
+            <template v-if="quoteModal.weight_netto_kg > 0">
+              <div class="breakdown-row pln-kg">
+                <span style="color:var(--muted)">Cena za kilogram netto</span>
+                <span :style="{
+                  fontWeight:'700', fontFamily:'\'DM Mono\',monospace',
+                  color: calcQuoteStructured()/quoteModal.weight_netto_kg < 15
+                    ? 'var(--rcm-green)'
+                    : calcQuoteStructured()/quoteModal.weight_netto_kg > 40
+                      ? 'var(--rcm-accent)'
+                      : 'var(--rcm-blue)'
+                }">{{ (calcQuoteStructured()/quoteModal.weight_netto_kg).toFixed(1) }} PLN/kg</span>
+              </div>
+            </template>
           </div>
         </template>
 
@@ -1223,7 +1610,8 @@ createApp({
       welding_hours:0, labor_hours:0,
       weight_netto_kg:0, weight_brutto_kg:0,
       overhead_pct:0.1, margin_pct:0.25,
-      savedQuote: null,  // po zapisie — pokazuje akcje post-submit
+      target_pln_kg:0,  // kompas cenowy — docelowa cena wyjściowa za kg
+      savedQuote: null,
     })
     const zaporModal = ref({ show:false, order:null, material_cost:0, hours_estimate:1 })
     const paramsModal = ref({ show:false, order:null, question:"" })
@@ -1388,6 +1776,7 @@ createApp({
         welding_hours:0, labor_hours:0,
         weight_netto_kg:0, weight_brutto_kg:0,
         overhead_pct:0.1, margin_pct:0.25,
+        target_pln_kg:0,
       }
     }
     function openZaporModal(o) {
@@ -1434,6 +1823,24 @@ createApp({
     async function confirmOrder(o) {
       if (!confirm(`Zatwierdzić wycenę dla ${o.client}?\nZlecenie trafi do produkcji.`)) return
       await api(`/orders/${o.id}/confirm`, { method:"POST" })
+      await loadOrders()
+    }
+
+    async function startOrder(o) {
+      if (!confirm(`Rozpocząć pracę nad zleceniem ${o.order_number} (${o.client})?`)) return
+      await api(`/orders/${o.id}/start`, { method:"POST" })
+      await loadOrders()
+    }
+
+    async function completeOrder(o) {
+      if (!confirm(`Oznaczyć zlecenie ${o.order_number} jako gotowe do odbioru?`)) return
+      await api(`/orders/${o.id}/complete`, { method:"POST" })
+      await loadOrders()
+    }
+
+    async function deliverOrder(o) {
+      if (!confirm(`Potwierdzić wydanie zlecenia ${o.order_number} klientowi ${o.client}?\nZlecenie zostanie zamknięte.`)) return
+      await api(`/orders/${o.id}/deliver`, { method:"POST" })
       await loadOrders()
     }
 
@@ -1524,11 +1931,11 @@ createApp({
     }
 
     // ── Computed ──────────────────────────────────────────────────────────
-    // Kolejka Technologa — niestandard (w tym quoted, czekające na akceptację Biura)
+    // Kolejka Technologa — wszystkie aktywne niestandard + zlecenia w trakcie realizacji
     const nonstandardOrders = computed(() =>
       orders.value.filter(o =>
         o.triage_branch === "niestandard" &&
-        !["rejected", "cancelled", "in_production", "done"].includes(o.status)
+        !["rejected", "cancelled", "done", "wydane"].includes(o.status)
       )
     )
 
@@ -1576,7 +1983,7 @@ createApp({
       submitOrderAndTriage, calcQuote, calcQuoteStructured,
       openOrder, deleteOrder, openQuoteModal, openZaporModal, openParamsModal,
       submitQuote, submitZapor, submitParamRequest,
-      confirmOrder, saveAsTemplate,
+      confirmOrder, startOrder, completeOrder, deliverOrder, saveAsTemplate,
       addSopBlock, removeSopBlock, saveTemplate,
       isOverdue,
     }

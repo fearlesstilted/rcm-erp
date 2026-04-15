@@ -6,13 +6,16 @@ Dostęp z sieci lokalnej: http://192.168.1.15:8000
 import pathlib
 import random
 import uuid
-from datetime import datetime, date
+from datetime import datetime, date, timezone
+
+def _now():
+    return datetime.now(timezone.utc).replace(tzinfo=None)
 from typing import List, Optional
 
 from fastapi import FastAPI, Depends, HTTPException, UploadFile, File, Form
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
-from fastapi.responses import FileResponse, Response
+from fastapi.responses import FileResponse, Response, StreamingResponse
 from pdf_gen import generate_arkusz_pdf
 from sqlalchemy.orm import Session
 from sqlalchemy import create_engine, func, text
@@ -33,7 +36,7 @@ from schemas import (
     QualityCardCreate, QualityCardOut,
     ParameterRequestCreate, ParameterRequestAnswer, ParameterRequestOut,
     TemplateCreate, TemplateOut,
-    AnalyticsSummary,
+    AnalyticsSummary, RevenueMonth, TopClient, OverdueOrder,
 )
 from triage import run_triage, TriageInput
 
@@ -46,10 +49,12 @@ Base.metadata.create_all(bind=engine)  # tworzy tabele jeśli nie istnieją
 # ─── Idempotentna migracja kolumn v2 dla istniejących baz ────────────────────
 def _ensure_quote_v2_columns(eng) -> None:
     """
-    Dodaje nowe kolumny do tabeli quotes jeśli ich nie ma.
+    Idempotentna migracja — dodaje brakujące kolumny do istniejących tabel.
     SQLite obsługuje tylko ALTER TABLE ADD COLUMN — bez ryzyka utraty danych.
+    Uruchamiana przy każdym starcie serwera.
     """
-    new_cols = [
+    # Kolumny dodane w v2 do tabeli quotes
+    quote_cols = [
         ("processes_json",     "TEXT DEFAULT '[]'"),
         ("weight_kg",          "REAL DEFAULT 0"),
         ("weight_rate_pln_kg", "REAL DEFAULT 15"),
@@ -58,11 +63,26 @@ def _ensure_quote_v2_columns(eng) -> None:
         ("weight_brutto_kg",   "REAL DEFAULT 0"),
         ("estimate_version",   "TEXT DEFAULT 'v1'"),
     ]
+    # Kolumny dodane do tabeli orders po pierwszym deploymencie
+    order_cols = [
+        ("order_type",     "TEXT DEFAULT 'remont'"),
+        ("sop_name",       "TEXT"),
+        ("description",    "TEXT"),
+        ("requires_visit", "INTEGER DEFAULT 0"),
+        ("quantity",       "INTEGER DEFAULT 1"),
+        ("is_defence",     "INTEGER DEFAULT 0"),
+    ]
     with eng.connect() as conn:
-        existing = {row[1] for row in conn.execute(text("PRAGMA table_info(quotes)"))}
-        for col_name, col_def in new_cols:
-            if col_name not in existing:
+        existing_quotes = {row[1] for row in conn.execute(text("PRAGMA table_info(quotes)"))}
+        for col_name, col_def in quote_cols:
+            if col_name not in existing_quotes:
                 conn.execute(text(f"ALTER TABLE quotes ADD COLUMN {col_name} {col_def}"))
+
+        existing_orders = {row[1] for row in conn.execute(text("PRAGMA table_info(orders)"))}
+        for col_name, col_def in order_cols:
+            if col_name not in existing_orders:
+                conn.execute(text(f"ALTER TABLE orders ADD COLUMN {col_name} {col_def}"))
+
         conn.commit()
 
 _ensure_quote_v2_columns(engine)
@@ -168,7 +188,7 @@ def list_orders(
 
 @app.get("/api/orders/{order_id}", response_model=OrderOut)
 def get_order(order_id: int, db: Session = Depends(get_db)):
-    order = db.query(Order).get(order_id)
+    order = db.get(Order, order_id)
     if not order:
         raise HTTPException(status_code=404, detail="Zlecenie nie znalezione")
     return order
@@ -177,7 +197,7 @@ def get_order(order_id: int, db: Session = Depends(get_db)):
 @app.delete("/api/orders/{order_id}", status_code=204)
 def delete_order(order_id: int, db: Session = Depends(get_db)):
     """Soft-delete: ustawia status='cancelled'. Nie usuwa z bazy."""
-    order = db.query(Order).get(order_id)
+    order = db.get(Order, order_id)
     if not order:
         raise HTTPException(status_code=404, detail="Zlecenie nie znalezione")
     order.status = "cancelled"
@@ -195,7 +215,7 @@ def triage_order(order_id: int, db: Session = Depends(get_db)):
     Uruchamia Triage Engine dla zlecenia.
     Aktualizuje order.status i order.triage_branch w bazie.
     """
-    order = db.query(Order).get(order_id)
+    order = db.get(Order, order_id)
     if not order:
         raise HTTPException(status_code=404, detail="Zlecenie nie znalezione")
 
@@ -240,12 +260,12 @@ def triage_order(order_id: int, db: Session = Depends(get_db)):
 @app.post("/api/orders/{order_id}/quote", response_model=QuoteOut, status_code=201)
 def create_quote(order_id: int, payload: QuoteCreate, db: Session = Depends(get_db)):
     """Ręczna wycena przez Technologa (gałąź Niestandard)."""
-    order = db.query(Order).get(order_id)
+    order = db.get(Order, order_id)
     if not order:
         raise HTTPException(status_code=404, detail="Zlecenie nie znalezione")
 
     # Pobierz stawkę robocizny z bazy — Fix #3: nie hardkod
-    rate_setting = db.query(Setting).get("labor_rate_pln")
+    rate_setting = db.get(Setting, "labor_rate_pln")
     labor_rate   = float(rate_setting.value) if rate_setting else 90.0
     # Oblicz cenę: (material + robocizna) × (1 + overhead) × (1 + marża)
     labor_cost  = payload.labor_hours * labor_rate
@@ -278,7 +298,7 @@ def create_zapor_quote(order_id: int, payload: QuoteZaporCreate, db: Session = D
     Cena = material × godziny × mnożnik losowy (3.0–4.5).
     Klient albo zapłaci dużo, albo sam odpadnie — obie opcje są dobre dla zakładu.
     """
-    order = db.query(Order).get(order_id)
+    order = db.get(Order, order_id)
     if not order:
         raise HTTPException(status_code=404, detail="Zlecenie nie znalezione")
 
@@ -322,11 +342,11 @@ def create_structured_quote(
     Formuła: procesy + materiał + waga×stawka + spawanie×stawka + robocizna_extra
     Następnie: ×(1+overhead) ×(1+marża)
     """
-    order = db.query(Order).get(order_id)
+    order = db.get(Order, order_id)
     if not order:
         raise HTTPException(status_code=404, detail="Zlecenie nie znalezione")
 
-    rate_setting = db.query(Setting).get("labor_rate_pln")
+    rate_setting = db.get(Setting, "labor_rate_pln")
     labor_rate   = float(rate_setting.value) if rate_setting else 90.0
 
     proc_total    = sum(p.cost for p in payload.processes)
@@ -370,12 +390,54 @@ def create_structured_quote(
 @app.post("/api/orders/{order_id}/confirm", response_model=OrderOut)
 def confirm_order(order_id: int, db: Session = Depends(get_db)):
     """Biuro zatwierdza wycenę Technologa → zlecenie trafia do produkcji."""
-    order = db.query(Order).get(order_id)
+    order = db.get(Order, order_id)
     if not order:
         raise HTTPException(status_code=404, detail="Zlecenie nie znalezione")
     if order.status != OrderStatus.quoted:
         raise HTTPException(status_code=409, detail="Tylko zlecenia w statusie 'quoted' można zatwierdzić")
     order.status = OrderStatus.in_production
+    db.commit()
+    db.refresh(order)
+    return order
+
+
+@app.post("/api/orders/{order_id}/start", response_model=OrderOut)
+def start_order(order_id: int, db: Session = Depends(get_db)):
+    """Technolog rozpoczyna pracę: in_production → w_trakcie."""
+    order = db.get(Order, order_id)
+    if not order:
+        raise HTTPException(status_code=404, detail="Zlecenie nie znalezione")
+    if order.status != OrderStatus.in_production:
+        raise HTTPException(status_code=409, detail="Tylko zlecenia 'in_production' można rozpocząć")
+    order.status = OrderStatus.w_trakcie
+    db.commit()
+    db.refresh(order)
+    return order
+
+
+@app.post("/api/orders/{order_id}/complete", response_model=OrderOut)
+def complete_order(order_id: int, db: Session = Depends(get_db)):
+    """Technolog kończy pracę: w_trakcie → gotowe (czeka na odbiór)."""
+    order = db.get(Order, order_id)
+    if not order:
+        raise HTTPException(status_code=404, detail="Zlecenie nie znalezione")
+    if order.status != OrderStatus.w_trakcie:
+        raise HTTPException(status_code=409, detail="Tylko zlecenia 'w_trakcie' można oznaczyć jako gotowe")
+    order.status = OrderStatus.gotowe
+    db.commit()
+    db.refresh(order)
+    return order
+
+
+@app.post("/api/orders/{order_id}/deliver", response_model=OrderOut)
+def deliver_order(order_id: int, db: Session = Depends(get_db)):
+    """Biuro wydaje zlecenie klientowi: gotowe → wydane."""
+    order = db.get(Order, order_id)
+    if not order:
+        raise HTTPException(status_code=404, detail="Zlecenie nie znalezione")
+    if order.status != OrderStatus.gotowe:
+        raise HTTPException(status_code=409, detail="Tylko zlecenia 'gotowe' można oznaczyć jako wydane")
+    order.status = OrderStatus.wydane
     db.commit()
     db.refresh(order)
     return order
@@ -387,7 +449,7 @@ def save_order_as_template(order_id: int, payload: dict, db: Session = Depends(g
     Technolog zapisuje niestandard jako szablon SOP — jeśli zlecenie się powtórzy,
     następnym razem trafi do gałęzi Standard automatycznie.
     """
-    order = db.query(Order).get(order_id)
+    order = db.get(Order, order_id)
     if not order:
         raise HTTPException(status_code=404, detail="Zlecenie nie znalezione")
     quote = db.query(Quote).filter(Quote.order_id == order_id).first()
@@ -430,7 +492,7 @@ async def upload_attachment(
     db: Session = Depends(get_db),
 ):
     """Wgraj plik (rysunek, PDF) do zlecenia. Max 50 MB."""
-    order = db.query(Order).get(order_id)
+    order = db.get(Order, order_id)
     if not order:
         raise HTTPException(status_code=404, detail="Zlecenie nie znalezione")
 
@@ -468,7 +530,7 @@ def list_attachments(order_id: int, db: Session = Depends(get_db)):
 @app.delete("/api/attachments/{att_id}", status_code=204)
 def delete_attachment(att_id: int, db: Session = Depends(get_db)):
     """Usuń załącznik — kasuje plik z dysku i rekord z bazy."""
-    att = db.query(OrderAttachment).get(att_id)
+    att = db.get(OrderAttachment, att_id)
     if not att:
         raise HTTPException(status_code=404, detail="Załącznik nie znaleziony")
     pathlib.Path(att.stored_path).unlink(missing_ok=True)   # usuń plik (cicho jeśli już nie ma)
@@ -524,7 +586,7 @@ def add_quality_card(
         check_surface   = payload.check_surface,
         passed          = payload.passed,
         checked_by      = payload.checked_by,
-        checked_at      = datetime.utcnow(),
+        checked_at      = _now(),
     )
     db.add(card)
     db.commit()
@@ -562,13 +624,13 @@ def answer_param_request(
     param_id: int, payload: ParameterRequestAnswer, db: Session = Depends(get_db)
 ):
     """Biuro odpowiada na pytanie Technologa."""
-    req = db.query(ParameterRequest).get(param_id)
+    req = db.get(ParameterRequest, param_id)
     if not req:
         raise HTTPException(status_code=404, detail="Pytanie nie znalezione")
 
     req.answer_text  = payload.answer_text
     req.status       = "answered"
-    req.answered_at  = datetime.utcnow()
+    req.answered_at  = _now()
     db.commit()
     db.refresh(req)
     return req
@@ -626,7 +688,7 @@ def archive_template(template_id: int, db: Session = Depends(get_db)):
     Stare zlecenia z tym template_id nadal działają i generują PDF.
     Szablon znika z listy u Biuro, ale historia jest nienaruszona.
     """
-    tmpl = db.query(ProductTemplate).get(template_id)
+    tmpl = db.get(ProductTemplate, template_id)
     if not tmpl:
         raise HTTPException(status_code=404, detail="Szablon nie znaleziony")
     if not tmpl.is_active:
@@ -638,7 +700,7 @@ def archive_template(template_id: int, db: Session = Depends(get_db)):
 @app.patch("/api/templates/{template_id}/restore", response_model=TemplateOut)
 def restore_template(template_id: int, db: Session = Depends(get_db)):
     """Przywraca zarchiwizowany szablon (odwrócenie soft delete)."""
-    tmpl = db.query(ProductTemplate).get(template_id)
+    tmpl = db.get(ProductTemplate, template_id)
     if not tmpl:
         raise HTTPException(status_code=404, detail="Szablon nie znaleziony")
     tmpl.is_active = True
@@ -657,9 +719,65 @@ def get_analytics(db: Session = Depends(get_db)):
     odrzut_count  = db.query(func.count(Order.id)).filter(Order.triage_branch == "odrzut").scalar()
     standard      = db.query(func.count(Order.id)).filter(Order.triage_branch == "standard").scalar()
     niestandard   = db.query(func.count(Order.id)).filter(Order.triage_branch == "niestandard").scalar()
-    in_prod       = db.query(func.count(Order.id)).filter(Order.status == "in_production").scalar()
-    done          = db.query(func.count(Order.id)).filter(Order.status == "done").scalar()
+    # Liczymy wszystkie "aktywne" zlecenia produkcyjne (in_production + w_trakcie + gotowe)
+    in_prod       = db.query(func.count(Order.id)).filter(
+        Order.status.in_(["in_production", "w_trakcie", "gotowe"])
+    ).scalar()
+    done          = db.query(func.count(Order.id)).filter(
+        Order.status.in_(["done", "wydane"])
+    ).scalar()
     avg_margin    = db.query(func.avg(Quote.margin_pct)).scalar()
+
+    # Przychód za ostatnie 6 miesięcy — suma wycen zatwierdzonych zleceń
+    revenue_rows = db.execute(text("""
+        SELECT strftime('%Y-%m', o.created_at) as month,
+               COUNT(o.id) as cnt,
+               COALESCE(SUM(q.total_net), 0) as revenue
+        FROM orders o
+        LEFT JOIN quotes q ON q.order_id = o.id
+        WHERE o.status IN ('w_trakcie','gotowe','wydane','done','in_production')
+          AND o.created_at >= date('now', '-6 months')
+        GROUP BY month
+        ORDER BY month ASC
+    """)).fetchall()
+    revenue_by_month = [
+        RevenueMonth(month=r[0], orders=r[1], revenue_pln=float(r[2]))
+        for r in revenue_rows
+    ]
+
+    # Top 5 klientów po liczbie zleceń i przychodzie
+    top_rows = db.execute(text("""
+        SELECT o.client,
+               COUNT(o.id) as cnt,
+               COALESCE(SUM(q.total_net), 0) as revenue
+        FROM orders o
+        LEFT JOIN quotes q ON q.order_id = o.id
+        WHERE o.status NOT IN ('rejected')
+        GROUP BY o.client
+        ORDER BY cnt DESC, revenue DESC
+        LIMIT 5
+    """)).fetchall()
+    top_clients = [
+        TopClient(client=r[0], orders=r[1], revenue_pln=float(r[2]))
+        for r in top_rows
+    ]
+
+    # Przeterminowane zlecenia — termin minął, a status nie jest końcowy
+    today = date.today().isoformat()
+    overdue_rows = db.execute(text(f"""
+        SELECT id, order_number, client, status, deadline
+        FROM orders
+        WHERE deadline < '{today}'
+          AND status NOT IN ('done','wydane','rejected')
+        ORDER BY deadline ASC
+    """)).fetchall()
+    overdue_orders = [
+        OverdueOrder(
+            id=r[0], order_number=r[1], client=r[2],
+            status=r[3], deadline=r[4]
+        )
+        for r in overdue_rows
+    ]
 
     return AnalyticsSummary(
         total_orders          = total or 0,
@@ -670,6 +788,58 @@ def get_analytics(db: Session = Depends(get_db)):
         avg_margin_pct        = round(float(avg_margin) * 100, 1) if avg_margin else None,
         orders_in_production  = in_prod or 0,
         orders_done           = done or 0,
+        revenue_by_month      = revenue_by_month,
+        top_clients           = top_clients,
+        overdue_orders        = overdue_orders,
+    )
+
+
+@app.get("/api/export/xlsx")
+def export_xlsx(db: Session = Depends(get_db)):
+    """Eksport wszystkich zleceń do pliku Excel (dla Dyrektora)."""
+    import io
+    from openpyxl import Workbook
+    from openpyxl.styles import Font, PatternFill, Alignment
+
+    orders = db.query(Order).order_by(Order.created_at.desc()).all()
+
+    wb = Workbook()
+    ws = wb.active
+    ws.title = "Zlecenia RCM"
+
+    # Nagłówek
+    headers = ["Nr", "Klient", "Status", "Gałąź", "Termin", "Wartość netto (PLN)", "Utworzono"]
+    header_font = Font(bold=True, color="FFFFFF")
+    header_fill = PatternFill("solid", fgColor="1A3A5C")  # --rcm-blue
+    for col, h in enumerate(headers, 1):
+        cell = ws.cell(row=1, column=col, value=h)
+        cell.font = header_font
+        cell.fill = header_fill
+        cell.alignment = Alignment(horizontal="center")
+
+    # Dane
+    for row_idx, o in enumerate(orders, 2):
+        quote = db.query(Quote).filter(Quote.order_id == o.id).first()
+        ws.cell(row=row_idx, column=1, value=o.order_number)
+        ws.cell(row=row_idx, column=2, value=o.client)
+        ws.cell(row=row_idx, column=3, value=o.status.value if o.status else "")
+        ws.cell(row=row_idx, column=4, value=o.triage_branch or "")
+        ws.cell(row=row_idx, column=5, value=o.deadline.isoformat() if o.deadline else "")
+        ws.cell(row=row_idx, column=6, value=float(quote.total_price_net) if quote and quote.total_price_net else 0)
+        ws.cell(row=row_idx, column=7, value=o.created_at.strftime("%Y-%m-%d") if o.created_at else "")
+
+    # Szerokości kolumn
+    for col, width in zip(range(1, 8), [12, 25, 15, 12, 12, 20, 12]):
+        ws.column_dimensions[ws.cell(row=1, column=col).column_letter].width = width
+
+    buf = io.BytesIO()
+    wb.save(buf)
+    buf.seek(0)
+
+    return StreamingResponse(
+        buf,
+        media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        headers={"Content-Disposition": "attachment; filename=zlecenia_rcm.xlsx"},
     )
 
 
@@ -714,7 +884,7 @@ def get_settings(db: Session = Depends(get_db)):
 @app.patch("/api/settings/{key}")
 def update_setting(key: str, payload: dict, db: Session = Depends(get_db)):
     """Zmień wartość ustawienia (np. stawkę robocizny) bez restartu serwera."""
-    setting = db.query(Setting).get(key)
+    setting = db.get(Setting, key)
     if not setting:
         raise HTTPException(status_code=404, detail=f"Ustawienie '{key}' nie istnieje")
     setting.value = str(payload.get("value", setting.value))
@@ -732,11 +902,11 @@ def get_order_pdf(order_id: int, db: Session = Depends(get_db)):
     Generuje PDF Arkusza Zlecenia dla operatorów CNC/Montaż.
     Zawiera: dane zlecenia, instrukcję SOP (instruction_blocks), Kartę Kontrolną.
     """
-    order = db.query(Order).get(order_id)
+    order = db.get(Order, order_id)
     if not order:
         raise HTTPException(status_code=404, detail="Zlecenie nie znalezione")
 
-    template = db.query(ProductTemplate).get(order.template_id) if order.template_id else None
+    template = db.get(ProductTemplate, order.template_id) if order.template_id else None
     quote    = db.query(Quote).filter(Quote.order_id == order_id).first()
 
     try:
@@ -762,11 +932,11 @@ def get_order_oferta(order_id: int, db: Session = Depends(get_db)):
     Zawiera: cena netto + brutto, termin, warunki płatności.
     NIE zawiera: stawek, robocizny, marży — to tajemnica handlowa.
     """
-    order = db.query(Order).get(order_id)
+    order = db.get(Order, order_id)
     if not order:
         raise HTTPException(status_code=404, detail="Zlecenie nie znalezione")
 
-    template = db.query(ProductTemplate).get(order.template_id) if order.template_id else None
+    template = db.get(ProductTemplate, order.template_id) if order.template_id else None
     quote    = db.query(Quote).filter(Quote.order_id == order_id).first()
 
     try:

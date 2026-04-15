@@ -39,9 +39,10 @@ def generate_arkusz_pdf(order, template, quote=None) -> bytes:
     try:
         from weasyprint import HTML
         return HTML(string=html_str, base_url=TEMPLATES_DIR).write_pdf()
-    except ImportError:
-        # WeasyPrint wymaga GTK/Cairo — na Windows może być brak zależności systemowych.
-        # Fallback: zwróć HTML zakodowany jako bytes. Przeglądarka otworzy go normalnie.
+    except (ImportError, OSError):
+        # ImportError: weasyprint nie zainstalowany.
+        # OSError: weasyprint zainstalowany ale brak GTK/gobject na Windows.
+        # Fallback: zwróć HTML — przeglądarka otworzy go normalnie.
         return html_str.encode("utf-8")
 
 
@@ -65,14 +66,14 @@ def generate_oferta_pdf(order, template, quote=None) -> bytes:
     try:
         from weasyprint import HTML
         return HTML(string=html_str, base_url=TEMPLATES_DIR).write_pdf()
-    except ImportError:
+    except (ImportError, OSError):
         return html_str.encode("utf-8")
 
 
 def get_content_type(order) -> str:
     """Zwraca poprawny Content-Type w zależności od dostępności WeasyPrint."""
     try:
-        import weasyprint  # noqa: F401
+        from weasyprint import HTML  # noqa: F401
         return "application/pdf"
-    except ImportError:
+    except (ImportError, OSError):
         return "text/html; charset=utf-8"

@@ -510,3 +510,81 @@ class TestAttachments:
     def test_delete_attachment_not_found(self, client):
         resp = client.delete("/api/attachments/9999")
         assert resp.status_code == 404
+
+
+# ─── Production pipeline (start / complete / deliver) ─────────────────────────
+
+class TestProductionPipeline:
+    def _order_in_production(self, client, db_session):
+        """Helper: create order, triage → niestandard, quote, confirm → in_production."""
+        seed_setting(db_session)
+        order_id = create_order(client, has_drawing=False).json()["id"]
+        client.post(f"/api/orders/{order_id}/triage")
+        client.post(f"/api/orders/{order_id}/quote/structured", json={
+            "processes": [{"name": "Spawanie", "cost": 400.0}],
+            "material_cost": 100.0, "weight_kg": 10.0,
+            "weight_rate_pln_kg": 15.0, "welding_hours": 1.0,
+        })
+        client.post(f"/api/orders/{order_id}/confirm")
+        return order_id
+
+    def test_start_moves_to_w_trakcie(self, client, db_session):
+        order_id = self._order_in_production(client, db_session)
+        resp = client.post(f"/api/orders/{order_id}/start")
+        assert resp.status_code == 200
+        assert resp.json()["status"] == "w_trakcie"
+
+    def test_complete_moves_to_gotowe(self, client, db_session):
+        order_id = self._order_in_production(client, db_session)
+        client.post(f"/api/orders/{order_id}/start")
+        resp = client.post(f"/api/orders/{order_id}/complete")
+        assert resp.status_code == 200
+        assert resp.json()["status"] == "gotowe"
+
+    def test_deliver_moves_to_wydane(self, client, db_session):
+        order_id = self._order_in_production(client, db_session)
+        client.post(f"/api/orders/{order_id}/start")
+        client.post(f"/api/orders/{order_id}/complete")
+        resp = client.post(f"/api/orders/{order_id}/deliver")
+        assert resp.status_code == 200
+        assert resp.json()["status"] == "wydane"
+
+    def test_start_guard_wrong_status(self, client, db_session):
+        """POST /start on a non in_production order returns 409."""
+        order_id = create_order(client).json()["id"]
+        resp = client.post(f"/api/orders/{order_id}/start")
+        assert resp.status_code == 409
+
+    def test_complete_guard_wrong_status(self, client, db_session):
+        """POST /complete on a non w_trakcie order returns 409."""
+        order_id = create_order(client).json()["id"]
+        resp = client.post(f"/api/orders/{order_id}/complete")
+        assert resp.status_code == 409
+
+    def test_deliver_guard_wrong_status(self, client, db_session):
+        """POST /deliver on a non gotowe order returns 409."""
+        order_id = create_order(client).json()["id"]
+        resp = client.post(f"/api/orders/{order_id}/deliver")
+        assert resp.status_code == 409
+
+    def test_full_pipeline_404(self, client):
+        for endpoint in ("start", "complete", "deliver"):
+            resp = client.post(f"/api/orders/9999/{endpoint}")
+            assert resp.status_code == 404, f"{endpoint} should 404"
+
+
+# ─── XLSX export ──────────────────────────────────────────────────────────────
+
+class TestExport:
+    def test_xlsx_export_returns_file(self, client, db_session):
+        """GET /api/export/xlsx returns an Excel file with correct content-type."""
+        create_order(client)
+        resp = client.get("/api/export/xlsx")
+        assert resp.status_code == 200
+        assert "spreadsheetml" in resp.headers["content-type"]
+        assert len(resp.content) > 0
+
+    def test_xlsx_export_empty_db(self, client):
+        """Export works even with no orders."""
+        resp = client.get("/api/export/xlsx")
+        assert resp.status_code == 200
