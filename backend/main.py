@@ -28,7 +28,7 @@ from models import (
     Setting, OrderStatus, TriageBranch, OrderAttachment, init_db
 )
 from schemas import (
-    OrderCreate, OrderOut, TriageResponse,
+    OrderCreate, OrderOut, OrderUpdate, TriageResponse,
     QuoteCreate, QuoteZaporCreate, QuoteOut,
     QuoteStructuredCreate,
     AttachmentOut,
@@ -203,6 +203,19 @@ def delete_order(order_id: int, db: Session = Depends(get_db)):
     order.status = "cancelled"
     db.commit()
     return Response(status_code=204)
+
+
+@app.patch("/api/orders/{order_id}", response_model=OrderOut)
+def update_order(order_id: int, data: OrderUpdate, db: Session = Depends(get_db)):
+    """Частичное обновление заказа. Обновляются только переданные поля (exclude_unset)."""
+    order = db.get(Order, order_id)
+    if not order:
+        raise HTTPException(status_code=404, detail="Zlecenie nie znalezione")
+    for field, value in data.model_dump(exclude_unset=True).items():
+        setattr(order, field, value)
+    db.commit()
+    db.refresh(order)
+    return order
 
 
 # =============================================================================

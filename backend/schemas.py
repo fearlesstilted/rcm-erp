@@ -61,6 +61,23 @@ class OrderOut(BaseModel):
     model_config = {"from_attributes": True}
 
 
+class OrderUpdate(BaseModel):
+    """Частичное обновление заказа (PATCH). Передаём только изменённые поля."""
+    client:          Optional[str]   = None
+    deadline:        Optional[date]  = None
+    material:        Optional[str]   = None
+    has_drawing:     Optional[bool]  = None
+    order_type:      Optional[str]   = None
+    sop_name:        Optional[str]   = None
+    purpose:         Optional[str]   = None
+    notes:           Optional[str]   = None
+    estimated_value: Optional[float] = None
+    description:     Optional[str]   = None
+    requires_visit:  Optional[bool]  = None
+    quantity:        Optional[int]   = None
+    is_defence:      Optional[bool]  = None
+
+
 # =============================================================================
 # TRIAGE
 # =============================================================================

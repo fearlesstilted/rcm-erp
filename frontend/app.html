@@ -758,7 +758,7 @@
           <h2>Kolejka — Niestandard</h2>
           <table>
             <thead>
-              <tr><th>Nr</th><th>Klient</th><th>Termin</th><th>Pytania Biuro</th><th>Akcje</th><th>📎</th></tr>
+              <tr><th>Nr</th><th>Klient</th><th>Termin</th><th>Status</th><th>Pytania Biuro</th><th>Akcje</th><th>📎</th></tr>
             </thead>
             <tbody>
               <template v-for="o in nonstandardOrders" :key="o.id">
@@ -768,6 +768,8 @@
                   <td :style="isOverdue(o.deadline) ? 'color:var(--rcm-red);font-weight:700' : ''">
                     {{ o.deadline }}
                   </td>
+                  <!-- Badge aktualnego statusu zlecenia -->
+                  <td><span :class="'badge badge-'+o.status" style="white-space:nowrap">{{ o.status }}</span></td>
                   <td>
                     <!-- Badge: ile pytań czeka na odpowiedź vs ile odpowiedziano -->
                     <span v-if="orderParams[o.id]?.some(p => p.status==='answered')"
@@ -818,7 +820,7 @@
                 </tr>
                 <!-- Rozwijany panel załączników -->
                 <tr v-if="expandedAttachments===o.id">
-                  <td colspan="6" style="background:#f8f9fa;padding:0">
+                  <td colspan="7" style="background:#f8f9fa;padding:0">
                     <div style="padding:12px 16px">
                       <div style="font-size:0.82rem;font-weight:600;color:var(--muted);margin-bottom:10px;text-transform:uppercase">
                         Załączniki — {{ o.order_number || '#'+o.id }}
@@ -852,7 +854,7 @@
                 </tr>
                 <!-- Rozwijany panel z pytaniami i odpowiedziami -->
                 <tr v-if="expandedParams===o.id">
-                  <td colspan="6" style="background:#fafbfc;padding:0">
+                  <td colspan="7" style="background:#fafbfc;padding:0">
                     <div style="padding:12px 16px">
                       <div v-if="!orderParams[o.id]?.length"
                            style="color:var(--muted);font-size:0.85rem">
@@ -882,7 +884,7 @@
                 </tr>
               </template>
               <tr v-if="nonstandardOrders.length===0">
-                <td colspan="6" style="text-align:center;color:var(--muted);padding:24px">
+                <td colspan="7" style="text-align:center;color:var(--muted);padding:24px">
                   Brak zleceń w kolejce ✓
                 </td>
               </tr>
@@ -1148,7 +1150,10 @@
       <div class="card" style="width:520px;max-height:90vh;overflow-y:auto">
         <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px">
           <h2 style="margin:0">Zlecenie #{{ detailsModal.order?.order_number }}</h2>
-          <button class="btn btn-outline btn-sm" @click="detailsModal.show=false">✕</button>
+          <div style="display:flex;gap:6px">
+            <button v-if="!detailsModal.editMode" class="btn btn-outline btn-sm" @click="startEdit()">✏️ Edytuj</button>
+            <button class="btn btn-outline btn-sm" @click="detailsModal.show=false">✕</button>
+          </div>
         </div>
         <template v-if="detailsModal.order">
           <!-- Flagi specjalne -->
@@ -1172,7 +1177,50 @@
             </span>
           </div>
 
-          <table style="width:100%;border-collapse:collapse;font-size:.9rem">
+          <!-- ── TRYB EDYCJI ───────────────────────────────────────────────── -->
+          <div v-if="detailsModal.editMode" style="display:flex;flex-direction:column;gap:10px">
+            <div style="display:flex;gap:10px">
+              <div style="flex:1">
+                <label style="font-size:.8rem;color:var(--muted)">Klient</label>
+                <input v-model="detailsModal.form.client" style="width:100%;margin-top:4px">
+              </div>
+              <div style="flex:1">
+                <label style="font-size:.8rem;color:var(--muted)">Termin</label>
+                <input type="date" v-model="detailsModal.form.deadline" style="width:100%;margin-top:4px">
+              </div>
+            </div>
+            <div>
+              <label style="font-size:.8rem;color:var(--muted)">Materiał</label>
+              <input v-model="detailsModal.form.material" placeholder="np. S235, stal nierdzewna..." style="width:100%;margin-top:4px">
+            </div>
+            <div>
+              <label style="font-size:.8rem;color:var(--muted)">Opis problemu</label>
+              <textarea v-model="detailsModal.form.description" rows="2" style="width:100%;margin-top:4px;resize:vertical"></textarea>
+            </div>
+            <div>
+              <label style="font-size:.8rem;color:var(--muted)">Uwagi</label>
+              <textarea v-model="detailsModal.form.notes" rows="2" style="width:100%;margin-top:4px;resize:vertical"></textarea>
+            </div>
+            <div>
+              <label style="font-size:.8rem;color:var(--muted)">Szacowana wartość (PLN)</label>
+              <input type="number" v-model="detailsModal.form.estimated_value" min="0" step="100" style="width:100%;margin-top:4px">
+            </div>
+            <div style="display:flex;gap:16px;align-items:center">
+              <label style="display:flex;align-items:center;gap:6px;cursor:pointer">
+                <input type="checkbox" v-model="detailsModal.form.has_drawing"> Rysunek techniczny
+              </label>
+              <label style="display:flex;align-items:center;gap:6px;cursor:pointer">
+                <input type="checkbox" v-model="detailsModal.form.requires_visit"> Wymaga wizyty
+              </label>
+            </div>
+            <div style="display:flex;gap:8px;margin-top:4px">
+              <button class="btn btn-primary" @click="saveEdit()">💾 Zapisz zmiany</button>
+              <button class="btn btn-outline" @click="detailsModal.editMode=false">Anuluj</button>
+            </div>
+          </div>
+
+          <!-- ── TRYB PODGLĄDU ─────────────────────────────────────────────── -->
+          <table v-else style="width:100%;border-collapse:collapse;font-size:.9rem">
             <tr style="border-bottom:1px solid var(--border)">
               <td style="padding:8px 0;color:var(--muted);width:38%">Klient</td>
               <td style="padding:8px 0;font-weight:600">{{ detailsModal.order.client }}</td>
@@ -1601,7 +1649,7 @@ createApp({
     })
 
     // Modals
-    const detailsModal = ref({ show:false, order:null })
+    const detailsModal = ref({ show:false, order:null, editMode:false, form:{} })
     const quoteModal = ref({
       show:false, order:null, mode:'structured',
       // v2 fields
@@ -1766,7 +1814,43 @@ createApp({
 
     // ── Modal handlers ────────────────────────────────────────────────────
     function openOrder(o) {
-      detailsModal.value = { show: true, order: o }
+      detailsModal.value = { show: true, order: o, editMode: false, form: {} }
+    }
+
+    function startEdit() {
+      const o = detailsModal.value.order
+      // Kopiujemy edytowalne pola do formularza edycji
+      detailsModal.value.form = {
+        client:          o.client,
+        deadline:        o.deadline,
+        material:        o.material || "",
+        description:     o.description || "",
+        notes:           o.notes || "",
+        estimated_value: o.estimated_value || "",
+        has_drawing:     o.has_drawing,
+        requires_visit:  o.requires_visit,
+      }
+      detailsModal.value.editMode = true
+    }
+
+    async function saveEdit() {
+      const id = detailsModal.value.order.id
+      const f  = detailsModal.value.form
+      // Wysyłamy tylko pola które mają wartość (puste string → null, puste liczby → pomijamy)
+      const payload = {}
+      if (f.client)          payload.client          = f.client
+      if (f.deadline)        payload.deadline        = f.deadline
+      if (f.material)        payload.material        = f.material
+      if (f.description)     payload.description     = f.description
+      if (f.notes)           payload.notes           = f.notes
+      if (f.estimated_value) payload.estimated_value = parseFloat(f.estimated_value)
+      payload.has_drawing    = f.has_drawing
+      payload.requires_visit = f.requires_visit
+
+      const updated = await api(`/orders/${id}`, { method:"PATCH", body: payload })
+      detailsModal.value.order    = updated  // aktualizujemy widok bez przeładowania
+      detailsModal.value.editMode = false
+      await loadOrders()
     }
     function openQuoteModal(o) {
       quoteModal.value = {
@@ -1981,7 +2065,7 @@ createApp({
       loadOrders, loadTemplates, loadAnalytics, loadHarmonogram, loadPytania, submitAnswer,
       toggleParams, toggleAttachments, uploadAttachment, deleteAttachment,
       submitOrderAndTriage, calcQuote, calcQuoteStructured,
-      openOrder, deleteOrder, openQuoteModal, openZaporModal, openParamsModal,
+      openOrder, deleteOrder, startEdit, saveEdit, openQuoteModal, openZaporModal, openParamsModal,
       submitQuote, submitZapor, submitParamRequest,
       confirmOrder, startOrder, completeOrder, deliverOrder, saveAsTemplate,
       addSopBlock, removeSopBlock, saveTemplate,

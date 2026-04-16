@@ -573,6 +573,31 @@ class TestProductionPipeline:
             assert resp.status_code == 404, f"{endpoint} should 404"
 
 
+# ─── PATCH order ──────────────────────────────────────────────────────────────
+
+class TestPatchOrder:
+    def test_patch_updates_client(self, client, db_session):
+        """PATCH /api/orders/{id} — zmiana klienta."""
+        order_id = create_order(client).json()["id"]
+        resp = client.patch(f"/api/orders/{order_id}", json={"client": "Nowy Klient S.A."})
+        assert resp.status_code == 200
+        assert resp.json()["client"] == "Nowy Klient S.A."
+
+    def test_patch_partial_update(self, client, db_session):
+        """PATCH nie nadpisuje pól których nie wysłaliśmy."""
+        order_id = create_order(client).json()["id"]
+        original = client.get(f"/api/orders/{order_id}").json()
+        client.patch(f"/api/orders/{order_id}", json={"notes": "Pilne!"})
+        updated = client.get(f"/api/orders/{order_id}").json()
+        assert updated["notes"] == "Pilne!"
+        assert updated["client"] == original["client"]   # niezmieniony
+
+    def test_patch_404(self, client):
+        """PATCH nieistniejącego zlecenia → 404."""
+        resp = client.patch("/api/orders/9999", json={"client": "X"})
+        assert resp.status_code == 404
+
+
 # ─── XLSX export ──────────────────────────────────────────────────────────────
 
 class TestExport:
