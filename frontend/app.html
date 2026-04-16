@@ -181,35 +181,26 @@
   .triage-niestandard { background: #fffbeb; color: #92400e; border: 1px solid #fcd34d; }
 
   /* ── Tabela ─────────────────────────────────────────────────── */
-  .table-wrap { border-radius: var(--radius); overflow: hidden; box-shadow: var(--sh-sm); }
-  table { width: 100%; border-collapse: collapse; font-size: 0.875rem; }
-  th {
-    padding: 11px 16px; text-align: left;
-    background: var(--rcm-blue); color: rgba(255,255,255,0.9);
-    font-size: 0.72rem; text-transform: uppercase; letter-spacing: 0.08em; font-weight: 600;
-  }
-  th:first-child { padding-left: 20px; }
-  td { padding: 12px 16px; border-bottom: 1px solid #f1f4f8; background: #fff; }
-  td:first-child { padding-left: 20px; }
-  tbody tr:last-child td { border-bottom: none; }
-  tbody tr:hover td { background: #f8fafd; }
+  table { width: 100%; border-collapse: collapse; font-size: 0.88rem; }
+  td { padding: 10px 12px; border-bottom: 1px solid var(--border); }
+  tr:hover td { background: #fafbfc; }
 
   /* ── Status badge ───────────────────────────────────────────── */
   .badge {
     display: inline-block; padding: 3px 9px; border-radius: 99px;
     font-size: 0.7rem; font-weight: 700; letter-spacing: 0.04em;
   }
-  .badge-draft         { background: #f1f5f9; color: #475569; }
-  .badge-standard      { background: #f0fdf4; color: #166534; border: 1px solid #bbf7d0; }
-  .badge-niestandard   { background: #fffbeb; color: #92400e; border: 1px solid #fde68a; }
-  .badge-quoted        { background: #eff6ff; color: #1d4ed8; border: 1px solid #bfdbfe; }
-  .badge-rejected      { background: #fef2f2; color: #991b1b; border: 1px solid #fecaca; }
-  .badge-in_production { background: #eef2ff; color: #3730a3; border: 1px solid #c7d2fe; }
-  .badge-w_trakcie     { background: #f0fdf4; color: #166534; border: 1px solid #86efac; }
-  .badge-gotowe        { background: #ecfeff; color: #164e63; border: 1px solid #a5f3fc; }
-  .badge-wydane        { background: #fdf4ff; color: #6b21a8; border: 1px solid #e9d5ff; }
-  .badge-done          { background: #f5f3ff; color: #4c1d95; border: 1px solid #ddd6fe; }
-  .badge-cancelled     { background: #f1f5f9; color: #94a3b8; text-decoration: line-through; }
+  .badge-draft         { background: #e0e0e0; color: #555; }
+  .badge-standard      { background: #e8f5e9; color: var(--rcm-green); }
+  .badge-niestandard   { background: #fff3e0; color: var(--rcm-warn); }
+  .badge-quoted        { background: #e3f2fd; color: #0d47a1; border: 1px solid #1565c0; }
+  .badge-rejected      { background: #ffebee; color: var(--rcm-red); }
+  .badge-in_production { background: #e8eaf6; color: #283593; }
+  .badge-w_trakcie     { background: #e8f5e9; color: #1b5e20; border: 1px solid #388e3c; }
+  .badge-gotowe        { background: #e0f7fa; color: #006064; border: 1px solid #0097a7; }
+  .badge-wydane        { background: #f3e5f5; color: #6a1b9a; }
+  .badge-done          { background: #ede7f6; color: #4527a0; }
+  .badge-cancelled     { background: #e0e0e0; color: #999; text-decoration: line-through; }
 
   /* ── Wizard steps ───────────────────────────────────────────── */
   .steps { display: flex; margin-bottom: 24px; border-radius: 8px; overflow: hidden; border: 1px solid var(--border); }
@@ -223,48 +214,44 @@
   .step.active { background: var(--rcm-blue); color: #fff; }
   .step.done   { background: #f0fdf4; color: var(--rcm-green); }
 
-  /* ── Field hint ─────────────────────────────────────────────── */
-  .field-hint { font-size: 0.73rem; color: var(--muted); margin-top: 4px; }
+  /* ── Sticky header ──────────────────────────────────────────── */
+  header { position: sticky; top: 0; z-index: 100; }
 
-  /* ── Mini dashboard ─────────────────────────────────────────── */
-  .mini-dash { display: flex; gap: 12px; flex-wrap: wrap; margin-bottom: 20px; }
+  /* ── Table polish ───────────────────────────────────────────── */
+  th { padding: 10px 12px; text-align: left; background: var(--rcm-blue); color: #fff;
+       font-size: 0.78rem; text-transform: uppercase; letter-spacing: 0.04em; }
+
+  /* ── Field hint ─────────────────────────────────────────────── */
+  .field-hint { font-size: 0.75rem; color: var(--muted); margin-top: 3px; font-style: italic; }
+
+  /* ── Mini dashboard (Biuro/Technolog) ──────────────────────── */
+  .mini-dash { display: flex; gap: 10px; flex-wrap: wrap; margin-bottom: 14px; }
   .mini-stat {
-    flex: 1; min-width: 120px; background: var(--card);
-    box-shadow: var(--sh-sm); border-radius: var(--radius);
-    padding: 14px 18px; border-left: 3px solid var(--rcm-blue);
-    transition: box-shadow 0.15s, transform 0.15s;
+    flex: 1; min-width: 120px; background: var(--card); border: 1px solid var(--border);
+    border-radius: var(--radius); padding: 10px 14px; border-left: 4px solid var(--rcm-blue);
   }
-  .mini-stat:hover { box-shadow: var(--sh-md); transform: translateY(-1px); }
   .mini-stat.warn  { border-left-color: var(--rcm-warn); }
   .mini-stat.green { border-left-color: var(--rcm-green); }
   .mini-stat.red   { border-left-color: var(--rcm-red); }
-  .mini-stat .n {
-    font-family: 'DM Mono', monospace; font-size: 2rem; font-weight: 500;
-    color: var(--rcm-blue); line-height: 1; margin-bottom: 4px;
-  }
+  .mini-stat .n  { font-size: 1.6rem; font-weight: 800; color: var(--rcm-blue); }
   .mini-stat.warn  .n { color: var(--rcm-warn); }
   .mini-stat.green .n { color: var(--rcm-green); }
   .mini-stat.red   .n { color: var(--rcm-red); }
-  .mini-stat .t { font-size: 0.72rem; color: var(--muted); font-weight: 500; letter-spacing: 0.02em; }
+  .mini-stat .t  { font-size: 0.75rem; color: var(--muted); margin-top: 2px; }
 
-  /* ── Analytics stat cards ───────────────────────────────────── */
-  .stat-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(155px, 1fr)); gap: 14px; }
+  /* ── Analytics cards ────────────────────────────────────────── */
+  .stat-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); gap: 12px; }
   .stat-card {
-    background: var(--card); box-shadow: var(--sh-sm);
-    border-radius: var(--radius); padding: 20px 18px;
-    text-align: center; border-top: 3px solid var(--rcm-blue);
-    transition: box-shadow 0.15s, transform 0.15s;
+    background: var(--card); border: 1px solid var(--border);
+    border-radius: var(--radius); padding: 16px; text-align: center;
+    border-top: 3px solid var(--rcm-blue);
   }
-  .stat-card:hover { box-shadow: var(--sh-md); transform: translateY(-2px); }
   .stat-card.accent-green  { border-top-color: var(--rcm-green); }
   .stat-card.accent-red    { border-top-color: var(--rcm-red); }
   .stat-card.accent-warn   { border-top-color: var(--rcm-warn); }
-  .stat-card.accent-purple { border-top-color: #7c3aed; }
-  .stat-card .num {
-    font-family: 'DM Mono', monospace; font-size: 2.1rem; font-weight: 500;
-    color: var(--rcm-blue); line-height: 1.1;
-  }
-  .stat-card .lbl { font-size: 0.72rem; color: var(--muted); margin-top: 6px; font-weight: 600; letter-spacing: 0.04em; text-transform: uppercase; }
+  .stat-card.accent-purple { border-top-color: #6a1b9a; }
+  .stat-card .num { font-size: 2rem; font-weight: 800; color: var(--rcm-blue); }
+  .stat-card .lbl { font-size: 0.78rem; color: var(--muted); margin-top: 4px; }
 
   /* ── Param badge ─────────────────────────────────────────────── */
   .param-badge {

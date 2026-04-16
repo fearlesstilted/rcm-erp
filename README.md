@@ -1,171 +1,173 @@
-# RCM ERP — Internal Work Order System
+# RCM ERP
 
-Manufacturing ERP for **RCM Sp. z o.o.** (Gołdap) — steel fabrication, welding, precast concrete.
-Replaces paper *Zlecenie Wewnętrzne* (internal work orders) with a browser-based system that routes orders, generates quotes, and tracks production status automatically.
+![CI](https://github.com/fearlesstilted/rcm-erp/actions/workflows/ci.yml/badge.svg)
+![Python](https://img.shields.io/badge/Python-3.11-3776AB?logo=python&logoColor=white)
+![FastAPI](https://img.shields.io/badge/FastAPI-0.115-009688?logo=fastapi&logoColor=white)
+![Vue.js](https://img.shields.io/badge/Vue.js-3-4FC08D?logo=vuedotjs&logoColor=white)
+![SQLite](https://img.shields.io/badge/SQLite-→%20PostgreSQL-003B57?logo=sqlite&logoColor=white)
+![Docker](https://img.shields.io/badge/Docker-ready-2496ED?logo=docker&logoColor=white)
 
-## The Problem It Solves
+Internal work order system for a steel fabrication shop. Handles the full cycle from client inquiry to shop-floor production: automatic routing, technologist estimation, PDF generation, and status tracking.
 
-The office creates a work order. The technologist gets it on paper. Someone calculates the price. The client waits.
-Every step is manual, and the technologist's time gets eaten by non-technical questions from the office.
+---
 
-This system routes orders in seconds: catalog jobs go straight to production with an auto-quote, non-standard jobs get queued for the technologist with a structured estimation form, and anything outside RCM's capabilities gets rejected immediately — before anyone spends time on it.
+## How It Works
+
+Every order runs through a 3-branch triage engine before a human sees it:
+
+```
+New order (Biuro)
+      │
+      ├─► ODRZUT       — reject rules from DB (material, deadline, scope)
+      │                  → instant rejection, reason logged
+      │
+      ├─► STANDARD     — catalog product or drawing + matching SOP template
+      │                  → price auto-calculated, no technologist needed
+      │
+      └─► NIESTANDARD  → technologist queue
+                          └─► QUOTED       — structured estimate submitted
+                                └─► IN_PRODUCTION → W_TRAKCIE → GOTOWE → WYDANE
+```
+
+Reject rules live in the database — the director adds new ones from the UI without touching code.
+
+---
+
+## Technologist Estimate Formula
+
+```
+base  = Σ(process costs)
+      + material cost
+      + weight_kg × rate_pln_kg
+      + welding_hours × labor_rate
+      + extra_labor_hours × labor_rate
+
+total = base × (1 + overhead_pct) × (1 + margin_pct)
+```
+
+After saving, one click promotes the estimate to a reusable SOP catalog entry — next identical order routes to STANDARD automatically.
+
+---
 
 ## Tech Stack
 
 | Layer | Technology |
 |-------|------------|
-| Backend | FastAPI + SQLAlchemy 2.0 |
-| Database | SQLite (MVP) — swap to PostgreSQL when ready |
-| Frontend | Vue 3 CDN — single `app.html`, no build step |
+| Backend | FastAPI 0.115 + SQLAlchemy 2.0 |
+| Database | SQLite (MVP) — swap to PostgreSQL with one connection string change |
+| Frontend | Vue 3 CDN, single `app.html`, no build step |
 | PDF | Jinja2 → WeasyPrint (HTML fallback on Windows without GTK) |
-| Deploy | Docker, office LAN at `http://192.168.1.15:8000` |
+| Export | openpyxl — XLSX download for director |
+| Deploy | Docker + docker-compose |
 
-## How Orders Flow — the Triage Engine
-
-Every new order runs through a 3-branch decision tree before it touches a human:
-
-```
-New Order (Biuro submits form)
-        │
-        ▼
-  [ODRZUT] ──── Hard rules from DB: aluminium, stainless, deadline < 2 days
-        │         → Immediate rejection with reason. No technologist time wasted.
-        │
-        ▼ (not rejected)
-  [STANDARD] ── Catalog product selected, OR has drawing + matching SOP template
-        │         → Price generated automatically. Technologist not needed.
-        │
-        ▼ (no template match)
-  [NIESTANDARD] → Technologist queue. Structured estimate form (see below).
-        │
-        ▼ (technologist saves wycena)
-  [QUOTED] ──── Biuro sees "✅ Zatwierdź" button. One click → in_production.
-        │
-        ▼
-  [IN_PRODUCTION] → [DONE]
-```
-
-Reject rules live in the database — the Director can add new ones from the UI without touching code.
-
-## Technologist Estimate Formula (v2)
-
-When an order hits NIESTANDARD, the technologist fills a structured form. Final price:
-
-```
-base = Σ(process costs)
-     + material purchase cost
-     + weight_kg × weight_rate_pln_kg   ← 7–30 PLN/kg by complexity
-     + welding_hours × labor_rate
-     + extra_labor_hours × labor_rate
-
-total_net = base × (1 + overhead_pct) × (1 + margin_pct)
-```
-
-`weight_netto_kg` and `weight_brutto_kg` are stored as reference only — they don't affect the price.
-After saving, one-click **"💾 Zapisz jako szablon SOP"** promotes the job to the Standard catalog for future orders.
+---
 
 ## Quick Start
 
 ```bash
-cd rcm_erp/backend
+git clone https://github.com/fearlesstilted/rcm-erp.git
+cd rcm-erp/backend
 
-# Install dependencies
 pip install -r requirements.txt
+set PYTHONIOENCODING=utf-8       # Windows only
 
-# On Windows: Polish characters need this env var
-set PYTHONIOENCODING=utf-8
-
-# Create DB + seed (templates, rules, prices from xlsx)
-python seed.py
-# Expected: 10 templates, 4 rules, 4 settings, 35 prices
-
-# Run (note: port 8000 may be blocked on Windows by PID 4 — use 8001)
+python seed.py                   # creates DB with templates, rules, settings, prices
 uvicorn main:app --host 0.0.0.0 --port 8001 --reload
-# Open: http://localhost:8001
 ```
 
-**PINs (MVP auth):**
-- Biuro (office): `1111`
-- Technolog: `2222`
-- Dyrektor: `3333`
+> Port 8000 is often held by Windows (PID 4). Use `--port 8001`.
 
-> **Existing DB?** No wipe needed. `_ensure_quote_v2_columns()` runs at startup and adds new columns via idempotent `ALTER TABLE`.
+**Login PINs:**
+
+| Role | PIN | Access |
+|------|-----|--------|
+| Biuro | `1111` | Submit orders, confirm quotes, hand off to client |
+| Technolog | `2222` | Estimation queue, structured form, file attachments |
+| Dyrektor | `3333` | Analytics, revenue, settings, XLSX export |
+
+---
 
 ## Project Structure
 
 ```
-rcm_erp/
+rcm-erp/
 ├── backend/
-│   ├── main.py          # FastAPI — all endpoints
-│   ├── models.py        # SQLAlchemy — 15 tables
-│   ├── schemas.py       # Pydantic — request/response validation
-│   ├── triage.py        # 3-branch routing engine
-│   ├── seed.py          # Initial data + xlsx price parser
-│   ├── pdf_gen.py       # PDF generation (arkusz + oferta)
-│   ├── uploads/         # File attachments (drawings, docs) — gitignored
-│   └── rcm_erp.db       # SQLite — gitignored, generate via seed.py
+│   ├── main.py       — FastAPI, all endpoints
+│   ├── models.py     — SQLAlchemy ORM, 15 tables
+│   ├── schemas.py    — Pydantic request/response contracts
+│   ├── triage.py     — 3-branch routing engine (pure functions)
+│   ├── seed.py       — initial data loader + xlsx price parser
+│   └── pdf_gen.py    — PDF generation, WeasyPrint with HTML fallback
 ├── frontend/
-│   └── app.html         # Full UI — Vue 3 CDN, 3 roles, ~1300 lines
+│   └── app.html      — Vue 3 SPA, 3 roles, no build step
 ├── templates/
-│   ├── arkusz.html      # Shop-floor PDF (no prices — commercial secret)
-│   └── oferta.html      # Client PDF (final price only, no rates/margin)
-├── tests/
-│   ├── test_triage.py   # Unit tests — triage engine (no DB, mock only)
-│   └── test_api.py      # Integration tests — FastAPI + in-memory SQLite
-├── Dockerfile
-├── docker-compose.yml
-└── requirements.txt
+│   ├── arkusz.html   — shop-floor PDF (no prices)
+│   └── oferta.html   — client PDF (final price only)
+└── tests/
+    ├── test_triage.py — unit tests, triage engine (MagicMock, no DB)
+    └── test_api.py    — integration tests, FastAPI + in-memory SQLite
 ```
 
-## API Reference (key endpoints)
+---
 
-| Method | Endpoint | Who | What |
-|--------|----------|-----|------|
-| POST | `/api/orders` | Biuro | Create order via wizard |
-| POST | `/api/orders/{id}/triage` | auto | Route order to branch |
-| POST | `/api/orders/{id}/quote/structured` | Technolog | V2 estimate (formula) |
-| POST | `/api/orders/{id}/quote` | Technolog | V1 estimate (simple) |
-| POST | `/api/orders/{id}/quote/zapor` | Technolog | Fuck-off price ×3–4.5 |
-| POST | `/api/orders/{id}/confirm` | Biuro | Approve quoted → in_production |
-| POST | `/api/orders/{id}/save-as-template` | Technolog | Promote job to SOP catalog |
-| POST | `/api/orders/{id}/attachments` | Technolog | Upload drawing/PDF (max 50MB) |
-| GET | `/api/orders/{id}/attachments` | any | List attachments |
-| DELETE | `/api/attachments/{id}` | Technolog | Remove attachment |
-| GET | `/api/orders/{id}/pdf` | any | Arkusz (shop floor, no PLN) |
-| GET | `/api/orders/{id}/oferta` | Biuro | Oferta (client, final price only) |
-| GET | `/api/analytics` | Dyrektor | Dashboard summary |
-| PATCH | `/api/settings/{key}` | Dyrektor | Update labor rate, margins etc. |
+## API
 
-## Two PDF Documents
+| Method | Endpoint | Role | Description |
+|--------|----------|------|-------------|
+| `POST` | `/api/orders` | Biuro | Create order |
+| `POST` | `/api/orders/{id}/triage` | auto | Route through decision tree |
+| `POST` | `/api/orders/{id}/quote/structured` | Technolog | V2 estimate (formula) |
+| `POST` | `/api/orders/{id}/quote` | Technolog | V1 estimate (simple price) |
+| `POST` | `/api/orders/{id}/quote/zapor` | Technolog | Deterrent price ×3–4.5 |
+| `POST` | `/api/orders/{id}/confirm` | Biuro | quoted → in_production |
+| `POST` | `/api/orders/{id}/start` | Technolog | in_production → w_trakcie |
+| `POST` | `/api/orders/{id}/complete` | Technolog | w_trakcie → gotowe |
+| `POST` | `/api/orders/{id}/deliver` | Biuro | gotowe → wydane |
+| `POST` | `/api/orders/{id}/save-as-template` | Technolog | promote estimate to SOP |
+| `POST` | `/api/orders/{id}/attachments` | Technolog | upload drawing/PDF (max 50 MB) |
+| `GET` | `/api/orders/{id}/pdf` | any | Arkusz (shop floor, no PLN) |
+| `GET` | `/api/orders/{id}/oferta` | Biuro | Oferta (client, final price only) |
+| `GET` | `/api/analytics` | Dyrektor | KPIs, revenue by month, top clients, overdue |
+| `GET` | `/api/export/xlsx` | Dyrektor | Excel export of all orders |
+| `PATCH` | `/api/settings/{key}` | Dyrektor | update labor rate, overhead, margin |
 
-The system generates two distinct documents from one order — deliberately separated:
+---
 
-- **Arkusz** (`/pdf`) — shop floor copy. Operations, SOP steps, material list. **No PLN anywhere** — welders don't need to know the margin.
-- **Oferta** (`/oferta`) — client copy. Final price net+VAT, delivery scope. **No rates, no SOP steps** — clients don't get to pick apart the quote.
+## PDF Documents
 
-## Key Business Rules (don't break these)
+Two documents from one order, deliberately separated:
 
-- Soft delete on templates — `DELETE /api/templates/{id}` sets `is_active=False`. Never hard-deletes. Old orders keep their FK references intact.
-- Arkusz for the shop floor must **never show PLN** — commercial secret from welders.
-- Oferta for the client must **never show rates or margin** — no basis for negotiation.
-- `is_defence` flag — defence/MON projects get a red stripe. Documents marked *poufne*.
-- Labor rate stored in `Setting` table (`labor_rate_pln`). Director changes via `PATCH /api/settings/labor_rate_pln` — no restart.
-- Quote upsert — each order has at most one Quote. Re-submitting overwrites.
-- File uploads stored at `backend/uploads/{order_id}/` — served via `/uploads` static mount.
+| Document | For | Shows | Hides |
+|----------|-----|-------|-------|
+| **Arkusz** (`/pdf`) | Shop floor | Operations, SOP steps, material | All PLN figures |
+| **Oferta** (`/oferta`) | Client | Final price net + VAT | Rates, margin, SOP |
 
-## Running Tests
+---
+
+## Business Rules
+
+- Soft delete on templates — `DELETE /api/templates/{id}` sets `is_active=False`, never hard-deletes. Old orders keep FK references intact.
+- Quote upsert — one quote per order, re-submitting overwrites.
+- `is_defence` flag — MON/defence orders get a red stripe, documents marked *poufne*.
+- Labor rate in DB — director updates via `PATCH /api/settings/labor_rate_pln`, takes effect immediately.
+- Arkusz never shows PLN. Oferta never shows rates or margin.
+
+---
+
+## Tests
 
 ```bash
-cd rcm_erp
+cd rcm-erp
 pip install pytest httpx
 pytest tests/ -v
 ```
 
-Expected output: **~30 tests, all passing**.
+63 tests across unit (triage engine) and integration (FastAPI + in-memory SQLite).
 
-## Docker (office LAN deploy)
+---
+
+## Docker
 
 ```bash
 docker-compose up --build
-# Accessible at http://192.168.1.15:8000 from any machine on the network
 ```
