@@ -21,11 +21,13 @@ def _render_html(order, template, quote) -> str:
         autoescape=select_autoescape(["html"]),
     )
     tmpl = env.get_template("arkusz.html")
+    operations = (quote.processes_json or []) if quote else []
     return tmpl.render(
         order=order,
-        sop_template=template,   # ProductTemplate (może być None dla Niestandard)
+        sop_template=template,
         quote=quote,
         today=date.today().strftime("%d.%m.%Y"),
+        operations=operations,
     )
 
 
@@ -57,11 +59,15 @@ def generate_oferta_pdf(order, template, quote=None) -> bytes:
         autoescape=select_autoescape(["html"]),
     )
     tmpl = env.get_template("oferta.html")
+    show_breakdown = bool(
+        quote and getattr(quote, "show_unit_prices", True) and quote.processes_json
+    )
     html_str = tmpl.render(
         order=order,
         sop_template=template,
         quote=quote,
         today=date.today().strftime("%d.%m.%Y"),
+        show_breakdown=show_breakdown,
     )
     try:
         from weasyprint import HTML

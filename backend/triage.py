@@ -11,7 +11,7 @@ Logika (dokładnie wg schematu z kartki):
 from dataclasses import dataclass
 from typing import Optional
 from sqlalchemy.orm import Session
-from models import ConstraintRule, ProductTemplate
+from models import ConstraintRule, ProductTemplate, ApprovedMaterial
 
 
 @dataclass
@@ -61,6 +61,21 @@ def run_triage(order: TriageInput, db: Session) -> TriageResult:
             else:
                 # action="warn" — zapisz ostrzeżenie, ale nie blokuj
                 warnings.append(rule.message or rule.rule_name)
+
+    # ----------------------------------------------------------------
+    # KROK 1b: WHITELIST MATERIAŁÓW
+    # Jeśli tabela approved_materials nie jest pusta i materiał zlecenia
+    # nie pasuje do żadnego wpisu — dodaj ostrzeżenie (nie blokuje).
+    # ----------------------------------------------------------------
+    if order.material:
+        approved = db.query(ApprovedMaterial).filter(ApprovedMaterial.is_active == True).all()
+        if approved:
+            material_lower = order.material.lower()
+            matched = any(material_lower == m.name.lower() for m in approved)
+            if not matched:
+                warnings.append(
+                    f"Nieznany materiał '{order.material}' — nie ma go na liście zatwierdzonych. Zweryfikuj."
+                )
 
     # ----------------------------------------------------------------
     # KROK 2: STANDARD

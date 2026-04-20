@@ -1,0 +1,11 @@
+{
+  "permissions": {
+    "allow": [
+      "WebFetch(domain:github.com)",
+      "Bash(py -3.11 -c ':*)",
+      "Bash(py -3.11 -m pytest tests/ -v --tb=short)",
+      "Bash(py -3.11 -m pip install pytest httpx -q)",
+      "Bash(py -3.11 -m pytest tests/test_api.py::TestAnalytics -v --tb=long)"
+    ]
+  }
+}

@@ -417,10 +417,11 @@
         <button :class="{active: tab==='templates'}"  @click="tab='templates';loadTemplates()">Katalog SOP</button>
         <button :class="{active: tab==='orders'}"     @click="tab='orders';loadOrders()">Wszystkie zlecenia</button>
       </template>
-      <!-- Dyrektor widzi: Dashboard, Harmonogram -->
+      <!-- Dyrektor widzi: Dashboard, Harmonogram, Benchmark -->
       <template v-if="currentUser.role === 'dyrektor'">
         <button :class="{active: tab==='analytics'}"  @click="tab='analytics';loadAnalytics()">Dashboard</button>
         <button :class="{active: tab==='harmonogram'}"@click="tab='harmonogram';loadHarmonogram()">Harmonogram</button>
+        <button :class="{active: tab==='benchmark'}"  @click="tab='benchmark';loadBenchmark()">📊 Benchmark cen</button>
         <button :class="{active: tab==='orders'}"     @click="tab='orders';loadOrders()">Wszystkie zlecenia</button>
       </template>
     </nav>
@@ -516,7 +517,15 @@
               <div class="form-row">
                 <div class="form-group">
                   <label>Materiał</label>
-                  <input v-model="wForm.material" placeholder="np. S355, Hardox, żeliwo">
+                  <input v-model="wForm.material" placeholder="np. S355, Hardox, żeliwo"
+                         list="material-suggestions">
+                  <datalist id="material-suggestions">
+                    <option v-for="m in approvedMaterials" :key="m.id" :value="m.name"></option>
+                  </datalist>
+                  <span v-if="wForm.material && approvedMaterials.length && !approvedMaterials.some(m=>m.name.toLowerCase()===wForm.material.toLowerCase())"
+                        style="font-size:0.75rem;color:#e65100;margin-top:3px;display:block">
+                    ⚠️ Nieznany materiał — sprawdź z Dyrektorem przed złożeniem
+                  </span>
                 </div>
                 <div class="form-group">
                   <label>Szacowana wartość (PLN)</label>
@@ -1085,6 +1094,84 @@
         </div>
       </div>
 
+      <!-- ── BENCHMARK (Dyrektor) ─────────────────────────────────────── -->
+      <div v-if="tab==='benchmark'">
+        <div class="card">
+          <h2>📊 Benchmark Ceny / kg</h2>
+          <div style="margin-bottom: 20px; display: flex; gap: 12px; flex-wrap: wrap;">
+            <div style="flex: 1; min-width: 150px;">
+              <label style="display: block; font-size: 0.85rem; margin-bottom: 4px; font-weight: 600;">Materiał:</label>
+              <input v-model="benchmarkFilters.material" type="text" placeholder="np. S235, nierdzewka..."
+                     style="width: 100%; padding: 8px;">
+            </div>
+            <div style="flex: 1; min-width: 150px;">
+              <label style="display: block; font-size: 0.85rem; margin-bottom: 4px; font-weight: 600;">Typ zlecenia:</label>
+              <input v-model="benchmarkFilters.order_type" type="text" placeholder="np. remont, nowa_czesc..."
+                     style="width: 100%; padding: 8px;">
+            </div>
+            <div style="align-self: flex-end;">
+              <button class="btn btn-primary" @click="loadBenchmark()">Szukaj</button>
+            </div>
+          </div>
+
+          <div v-if="benchmarkData" style="margin-bottom: 24px;">
+            <!-- Stats cards -->
+            <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 12px; margin-bottom: 20px;">
+              <div style="background: #f5f5f5; border-left: 4px solid #2563eb; padding: 12px; border-radius: 4px;">
+                <div style="font-size: 0.8rem; color: #666; text-transform: uppercase; letter-spacing: 0.05em;">Średnia</div>
+                <div style="font-size: 1.5rem; font-weight: 700; color: #1a1a2e;">{{ benchmarkData.avg_pln_kg.toFixed(2) }} PLN/kg</div>
+              </div>
+              <div style="background: #f5f5f5; border-left: 4px solid #059669; padding: 12px; border-radius: 4px;">
+                <div style="font-size: 0.8rem; color: #666; text-transform: uppercase; letter-spacing: 0.05em;">Minimum</div>
+                <div style="font-size: 1.5rem; font-weight: 700; color: #1a1a2e;">{{ benchmarkData.min_pln_kg.toFixed(2) }} PLN/kg</div>
+              </div>
+              <div style="background: #f5f5f5; border-left: 4px solid #dc2626; padding: 12px; border-radius: 4px;">
+                <div style="font-size: 0.8rem; color: #666; text-transform: uppercase; letter-spacing: 0.05em;">Maximum</div>
+                <div style="font-size: 1.5rem; font-weight: 700; color: #1a1a2e;">{{ benchmarkData.max_pln_kg.toFixed(2) }} PLN/kg</div>
+              </div>
+              <div style="background: #f5f5f5; border-left: 4px solid #f59e0b; padding: 12px; border-radius: 4px;">
+                <div style="font-size: 0.8rem; color: #666; text-transform: uppercase; letter-spacing: 0.05em;">Próbek</div>
+                <div style="font-size: 1.5rem; font-weight: 700; color: #1a1a2e;">{{ benchmarkData.count }}</div>
+              </div>
+            </div>
+
+            <div v-if="benchmarkData.warning" style="background: #fef3c7; border: 1px solid #fcd34d; border-radius: 6px; padding: 12px; margin-bottom: 20px; color: #92400e;">
+              ⚠️ {{ benchmarkData.warning }}
+            </div>
+
+            <!-- Samples table -->
+            <div v-if="benchmarkData.samples && benchmarkData.samples.length > 0">
+              <h3 style="margin-bottom: 12px; font-size: 1.1rem;">Historyczne zlecenia:</h3>
+              <table>
+                <thead>
+                  <tr>
+                    <th>Data</th>
+                    <th>Waga (kg)</th>
+                    <th>Cena netto (PLN)</th>
+                    <th>PLN/kg</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <tr v-for="s in benchmarkData.samples" :key="s.order_id">
+                    <td>{{ s.date }}</td>
+                    <td>{{ s.weight_kg.toFixed(1) }}</td>
+                    <td>{{ s.total_net.toFixed(2) }}</td>
+                    <td style="font-weight: 700; color: #2563eb;">{{ s.pln_kg.toFixed(2) }}</td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+            <div v-else style="text-align: center; color: #999; padding: 20px;">
+              Brak próbek dla wybranego materiału/typu.
+            </div>
+          </div>
+
+          <div v-else style="text-align: center; color: #999; padding: 40px;">
+            Wprowadź kryteria i kliknij "Szukaj" aby wyświetlić benchmark.
+          </div>
+        </div>
+      </div>
+
       <!-- ── PYTANIA OD TECHNOLOGA (Biuro) ─────────────────────────────── -->
       <div v-if="tab==='pytania'">
         <div class="card">
@@ -1132,9 +1219,9 @@
     </main><!-- /main -->
 
     <!-- ═══ MODAL: Szczegóły zlecenia ════════════════════════════════════ -->
-    <div v-if="detailsModal.show" style="position:fixed;inset:0;background:rgba(0,0,0,.5);display:flex;align-items:center;justify-content:center;z-index:100"
+    <div v-if="detailsModal.show" style="position:fixed;inset:0;background:rgba(0,0,0,.5);display:flex;align-items:center;justify-content:center;z-index:100;padding:16px"
          @click.self="detailsModal.show=false">
-      <div class="card" style="width:520px;max-height:90vh;overflow-y:auto">
+      <div class="card" style="width:min(520px,100%);max-height:90vh;overflow-y:auto">
         <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px">
           <h2 style="margin:0">Zlecenie #{{ detailsModal.order?.order_number }}</h2>
           <div style="display:flex;gap:6px">
@@ -1178,7 +1265,8 @@
             </div>
             <div>
               <label style="font-size:.8rem;color:var(--muted)">Materiał</label>
-              <input v-model="detailsModal.form.material" placeholder="np. S235, stal nierdzewna..." style="width:100%;margin-top:4px">
+              <input v-model="detailsModal.form.material" placeholder="np. S235, stal nierdzewna..."
+                     list="material-suggestions" style="width:100%;margin-top:4px">
             </div>
             <div>
               <label style="font-size:.8rem;color:var(--muted)">Opis problemu</label>
@@ -1209,19 +1297,19 @@
           <!-- ── TRYB PODGLĄDU ─────────────────────────────────────────────── -->
           <table v-else style="width:100%;border-collapse:collapse;font-size:.9rem">
             <tr style="border-bottom:1px solid var(--border)">
-              <td style="padding:8px 0;color:var(--muted);width:38%">Klient</td>
-              <td style="padding:8px 0;font-weight:600">{{ detailsModal.order.client }}</td>
+              <td style="padding:10px 8px 10px 6px;color:var(--muted);width:38%">Klient</td>
+              <td style="padding:10px 8px 10px 6px;font-weight:600">{{ detailsModal.order.client }}</td>
             </tr>
             <tr style="border-bottom:1px solid var(--border)">
-              <td style="padding:8px 0;color:var(--muted)">Termin (graniczny)</td>
-              <td style="padding:8px 0;font-weight:600"
+              <td style="padding:10px 8px 10px 6px;color:var(--muted)">Termin (graniczny)</td>
+              <td style="padding:10px 8px 10px 6px;font-weight:600"
                   :style="detailsModal.order.deadline < new Date().toISOString().slice(0,10) ? 'color:var(--rcm-red)' : ''">
                 {{ detailsModal.order.deadline ? detailsModal.order.deadline.split('-').reverse().join('.') : '—' }}
               </td>
             </tr>
             <tr style="border-bottom:1px solid var(--border)">
-              <td style="padding:8px 0;color:var(--muted)">Typ zlecenia</td>
-              <td style="padding:8px 0">
+              <td style="padding:10px 8px 10px 6px;color:var(--muted)">Typ zlecenia</td>
+              <td style="padding:10px 0">
                 {{ detailsModal.order.order_type === 'remont' ? '🔧 Remont / Naprawa'
                  : detailsModal.order.order_type === 'catalog' ? '📋 Produkt z katalogu'
                  : detailsModal.order.order_type === 'nowa_czesc' ? '⚙️ Nowa część / Projekt'
@@ -1229,45 +1317,58 @@
               </td>
             </tr>
             <tr v-if="detailsModal.order.sop_name" style="border-bottom:1px solid var(--border)">
-              <td style="padding:8px 0;color:var(--muted)">SOP / Szablon</td>
-              <td style="padding:8px 0">{{ detailsModal.order.sop_name }}</td>
+              <td style="padding:10px 8px 10px 6px;color:var(--muted)">SOP / Szablon</td>
+              <td style="padding:10px 0">{{ detailsModal.order.sop_name }}</td>
             </tr>
             <tr v-if="detailsModal.order.material" style="border-bottom:1px solid var(--border)">
-              <td style="padding:8px 0;color:var(--muted)">Materiał</td>
-              <td style="padding:8px 0">{{ detailsModal.order.material }}</td>
+              <td style="padding:10px 8px 10px 6px;color:var(--muted)">Materiał</td>
+              <td style="padding:10px 0">
+                <div style="font-weight:600">{{ detailsModal.order.material }}</div>
+                <div v-if="approvedMaterials.length && !approvedMaterials.some(m=>m.name.toLowerCase()===detailsModal.order.material.toLowerCase())"
+                     style="display:inline-block;white-space:nowrap;background:#fff3e0;color:#e65100;border-radius:4px;padding:2px 8px;font-size:0.73rem;font-weight:600;margin-top:4px">
+                  ⚠️ niezatwierdzony materiał
+                </div>
+              </td>
             </tr>
             <tr v-if="detailsModal.order.description" style="border-bottom:1px solid var(--border)">
-              <td style="padding:8px 0;color:var(--muted)">Opis problemu</td>
-              <td style="padding:8px 0">{{ detailsModal.order.description }}</td>
+              <td style="padding:10px 8px 10px 6px;color:var(--muted)">Opis problemu</td>
+              <td style="padding:10px 0">{{ detailsModal.order.description }}</td>
             </tr>
             <tr v-if="detailsModal.order.notes" style="border-bottom:1px solid var(--border)">
-              <td style="padding:8px 0;color:var(--muted)">Uwagi</td>
-              <td style="padding:8px 0">{{ detailsModal.order.notes }}</td>
+              <td style="padding:10px 8px 10px 6px;color:var(--muted)">Uwagi</td>
+              <td style="padding:10px 0">{{ detailsModal.order.notes }}</td>
             </tr>
             <tr v-if="detailsModal.order.estimated_value" style="border-bottom:1px solid var(--border)">
-              <td style="padding:8px 0;color:var(--muted)">Szac. wartość</td>
-              <td style="padding:8px 0;font-weight:700;color:var(--rcm-green);font-size:1.05rem">
+              <td style="padding:10px 8px 10px 6px;color:var(--muted)">Szac. wartość</td>
+              <td style="padding:10px 8px 10px 6px;font-weight:700;color:var(--rcm-green);font-size:1.05rem">
                 {{ detailsModal.order.estimated_value }} PLN
               </td>
             </tr>
             <tr v-if="detailsModal.order.quantity && detailsModal.order.order_type==='catalog'">
-              <td style="padding:8px 0;color:var(--muted)">Ilość</td>
-              <td style="padding:8px 0">{{ detailsModal.order.quantity }} szt.</td>
+              <td style="padding:10px 8px 10px 6px;color:var(--muted)">Ilość</td>
+              <td style="padding:10px 0">{{ detailsModal.order.quantity }} szt.</td>
             </tr>
           </table>
         </template>
-        <div style="margin-top:16px;display:flex;justify-content:space-between;align-items:center">
+        <div style="margin-top:16px;display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px">
           <button class="btn btn-sm" style="color:#c62828;border:1px solid #c62828;background:none;border-radius:6px;padding:6px 14px;cursor:pointer"
                   @click="deleteOrder(detailsModal.order)">🗑 Usuń zlecenie</button>
-          <button class="btn btn-outline" @click="detailsModal.show=false">Zamknij</button>
+          <div style="display:flex;gap:8px">
+            <button v-if="['quoted','in_production'].includes(detailsModal.order?.status)"
+                    class="btn btn-outline btn-sm"
+                    @click="openQuoteModal(detailsModal.order); detailsModal.show=false">
+              ✏️ Edytuj wycenę
+            </button>
+            <button class="btn btn-outline" @click="detailsModal.show=false">Zamknij</button>
+          </div>
         </div>
       </div>
     </div>
 
     <!-- ═══ MODAL: Wycena strukturalna (v2) ═══════════════════════════════ -->
     <div v-if="quoteModal.show" style="position:fixed;inset:0;background:rgba(0,0,0,.5);display:flex;align-items:center;justify-content:center;z-index:100;padding:16px">
-      <div class="card" style="width:640px;max-height:92vh;overflow-y:auto">
-        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px">
+      <div class="card" style="width:min(820px,97vw);max-height:92vh;overflow-y:auto">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px">
           <h2 style="margin-bottom:0">Wycena — {{ quoteModal.order?.client }}</h2>
           <!-- Przełącznik trybu: v2 strukturalna / v1 prosta -->
           <div style="display:flex;gap:6px">
@@ -1282,160 +1383,209 @@
           </div>
         </div>
 
-        <!-- ── TRYB V2: Formuła Technologa ─────────────────────────────── -->
+        <!-- ── KONTEKST ZLECENIA — niezmienne dane dla Technologa ───────── -->
+        <div style="background:var(--bg);border:1px solid var(--border);border-radius:var(--radius);padding:12px 16px;margin-bottom:18px;font-size:0.84rem">
+          <div style="font-size:0.68rem;font-weight:700;letter-spacing:0.09em;text-transform:uppercase;color:var(--muted);margin-bottom:10px">📋 Dane zlecenia</div>
+          <div style="display:grid;grid-template-columns:1fr 1fr;row-gap:8px;column-gap:24px">
+            <div>
+              <div style="font-size:0.7rem;color:var(--muted);margin-bottom:2px">Klient</div>
+              <strong>{{ quoteModal.order?.client }}</strong>
+            </div>
+            <div>
+              <div style="font-size:0.7rem;color:var(--muted);margin-bottom:2px">Termin</div>
+              <strong :style="quoteModal.order?.deadline < new Date().toISOString().slice(0,10) ? 'color:var(--rcm-red)' : ''">
+                {{ quoteModal.order?.deadline ? quoteModal.order.deadline.split('-').reverse().join('.') : '—' }}
+              </strong>
+            </div>
+            <div v-if="quoteModal.order?.material">
+              <div style="font-size:0.7rem;color:var(--muted);margin-bottom:2px">Materiał</div>
+              <strong>{{ quoteModal.order.material }}</strong>
+              <span v-if="approvedMaterials.length && !approvedMaterials.some(m=>m.name.toLowerCase()===quoteModal.order.material.toLowerCase())"
+                    style="display:inline-block;white-space:nowrap;background:#fff3e0;color:#e65100;border-radius:4px;padding:1px 7px;font-size:0.68rem;font-weight:600;margin-left:6px">
+                ⚠️ niezatwierdzony
+              </span>
+            </div>
+            <div>
+              <div style="font-size:0.7rem;color:var(--muted);margin-bottom:2px">Typ</div>
+              <span>{{ quoteModal.order?.order_type === 'remont' ? '🔧 Remont'
+               : quoteModal.order?.order_type === 'catalog' ? '📋 Katalog'
+               : quoteModal.order?.order_type === 'nowa_czesc' ? '⚙️ Nowa część'
+               : quoteModal.order?.order_type || '—' }}</span>
+            </div>
+            <div v-if="quoteModal.order?.description" style="grid-column:1/-1">
+              <div style="font-size:0.7rem;color:var(--muted);margin-bottom:2px">Opis</div>
+              <span>{{ quoteModal.order.description }}</span>
+            </div>
+            <div v-if="quoteModal.order?.notes" style="grid-column:1/-1">
+              <div style="font-size:0.7rem;color:var(--muted);margin-bottom:2px">Uwagi</div>
+              <span>{{ quoteModal.order.notes }}</span>
+            </div>
+            <div v-if="quoteModal.order?.has_drawing" style="grid-column:1/-1;color:#2e7d32;font-size:0.8rem">
+              ✅ Rysunek techniczny dołączony
+            </div>
+          </div>
+          <div v-if="quoteModal.savedQuote?.last_edited_at" style="margin-top:10px;color:var(--rcm-blue);font-size:0.75rem;border-top:1px solid var(--border);padding-top:8px">
+            ✏️ Ostatnia edycja: {{ new Date(quoteModal.savedQuote.last_edited_at + 'Z').toLocaleString('pl-PL') }}
+          </div>
+        </div>
+
+        <!-- ── TRYB V3: Formuła Technologa (3 sekcje) ──────────────────── -->
         <template v-if="quoteModal.mode==='structured'">
 
-          <!-- ▸ KOMPAS CENOWY ──────────────────────────────────────────── -->
-          <div class="kompas-box">
-            <div style="font-size:0.72rem;font-weight:700;letter-spacing:0.08em;text-transform:uppercase;color:rgba(255,255,255,0.5);margin-bottom:10px">
-              ⬡ Kompas cenowy — docelowa stawka wyjściowa
+          <!-- ═══ SEKCJA 1: MATERIAŁ ══════════════════════════════════════ -->
+          <div style="border:1.5px solid var(--border);border-radius:var(--radius);margin-bottom:14px;overflow:hidden">
+            <div style="background:var(--rcm-blue);color:#fff;font-size:0.72rem;font-weight:700;letter-spacing:0.1em;text-transform:uppercase;padding:8px 14px">
+              📦 1. Materiał (Arkusze / Surowiec)
             </div>
-            <div style="display:flex;gap:12px;align-items:flex-end;flex-wrap:wrap">
-              <div style="flex:1;min-width:120px">
-                <label style="font-size:0.72rem;letter-spacing:0.06em">Waga netto (kg)</label>
-                <input type="number" v-model.number="quoteModal.weight_netto_kg" min="0" step="0.5"
-                       placeholder="0" style="width:100%;margin-top:4px">
-              </div>
-              <div style="flex:1;min-width:120px">
-                <label style="font-size:0.72rem;letter-spacing:0.06em">Docelowa stawka (PLN/kg)</label>
-                <input type="number" v-model.number="quoteModal.target_pln_kg" min="0" step="1"
-                       placeholder="np. 30" style="width:100%;margin-top:4px">
-              </div>
-              <div style="min-width:140px;padding-bottom:2px">
-                <div style="font-size:0.7rem;color:rgba(255,255,255,0.5);margin-bottom:4px;letter-spacing:0.04em">Rekomendowana cena</div>
-                <div class="kompas-result">
-                  {{ quoteModal.weight_netto_kg > 0 && quoteModal.target_pln_kg > 0
-                      ? Math.round(quoteModal.weight_netto_kg * quoteModal.target_pln_kg * (1+(quoteModal.overhead_pct||0)) * (1+(quoteModal.margin_pct||0))).toLocaleString('pl-PL')
-                      : '—' }} PLN
+            <div style="padding:14px;display:flex;flex-direction:column;gap:10px">
+              <div class="form-row">
+                <div class="form-group">
+                  <label>Waga surowca (kg)</label>
+                  <input type="number" v-model.number="quoteModal.material_weight_kg" min="0" step="0.5" placeholder="np. 50">
+                  <span class="field-hint">Ile kg materiału kupujemy (S235, blach, profili)</span>
                 </div>
-                <!-- porównanie z bieżącą wyceną -->
-                <template v-if="quoteModal.weight_netto_kg > 0 && quoteModal.target_pln_kg > 0 && calcQuoteStructured() > 0">
-                  <div :class="['kompas-diff',
-                    Math.abs(calcQuoteStructured() - quoteModal.weight_netto_kg*quoteModal.target_pln_kg*(1+(quoteModal.overhead_pct||0))*(1+(quoteModal.margin_pct||0))) /
-                    (quoteModal.weight_netto_kg*quoteModal.target_pln_kg*(1+(quoteModal.overhead_pct||0))*(1+(quoteModal.margin_pct||0))) < 0.1 ? 'ok'
-                    : Math.abs(calcQuoteStructured() - quoteModal.weight_netto_kg*quoteModal.target_pln_kg*(1+(quoteModal.overhead_pct||0))*(1+(quoteModal.margin_pct||0))) /
-                      (quoteModal.weight_netto_kg*quoteModal.target_pln_kg*(1+(quoteModal.overhead_pct||0))*(1+(quoteModal.margin_pct||0))) < 0.25 ? 'warn' : 'over'
-                  ]">
-                    Twoja wycena: {{ calcQuoteStructured() }} PLN
-                    ({{ calcQuoteStructured() > quoteModal.weight_netto_kg*quoteModal.target_pln_kg*(1+(quoteModal.overhead_pct||0))*(1+(quoteModal.margin_pct||0)) ? '+' : '' }}{{ Math.round((calcQuoteStructured()/(quoteModal.weight_netto_kg*quoteModal.target_pln_kg*(1+(quoteModal.overhead_pct||0))*(1+(quoteModal.margin_pct||0)))-1)*100) }}% vs cel)
-                  </div>
-                </template>
+                <div class="form-group">
+                  <label>Cena surowca (PLN/kg)</label>
+                  <input type="number" v-model.number="quoteModal.material_price_per_kg" min="0" step="0.10" placeholder="np. 3.50">
+                  <span class="field-hint">S235 ≈ 3–4 PLN/kg · nierdzewka ≈ 12+ PLN/kg</span>
+                </div>
+              </div>
+              <!-- Live kalkulacja kosztu materiału -->
+              <div v-if="quoteModal.material_weight_kg > 0 && quoteModal.material_price_per_kg > 0"
+                   style="background:var(--bg);border-radius:6px;padding:8px 12px;display:flex;justify-content:space-between;align-items:center;font-size:0.85rem">
+                <span style="color:var(--muted)">{{ quoteModal.material_weight_kg }} kg × {{ quoteModal.material_price_per_kg }} PLN/kg</span>
+                <span style="font-weight:700;color:var(--rcm-blue)">= {{ Math.round(quoteModal.material_weight_kg * quoteModal.material_price_per_kg) }} PLN</span>
+              </div>
+              <!-- Informacyjne masy gotowego wyrobu -->
+              <div class="form-row" style="margin-top:4px">
+                <div class="form-group">
+                  <label style="color:var(--muted)">Masa netto wyrobu (kg)</label>
+                  <input type="number" v-model.number="quoteModal.weight_netto_kg" min="0" step="0.5" placeholder="masa gotowego produktu">
+                </div>
+                <div class="form-group">
+                  <label style="color:var(--muted)">Masa brutto z opakowaniem (kg)</label>
+                  <input type="number" v-model.number="quoteModal.weight_brutto_kg" min="0" step="0.5">
+                </div>
               </div>
             </div>
           </div>
-          <!-- waga brutto osobno — mniej ważna -->
-          <div class="form-group" style="margin-bottom:14px;max-width:200px">
-            <label style="color:var(--muted)">Waga brutto (kg)</label>
-            <input type="number" v-model.number="quoteModal.weight_brutto_kg" min="0" step="0.5">
-          </div>
 
-          <!-- ▸ KOSZTY SZCZEGÓŁOWE ──────────────────────────────────────── -->
-          <!-- Procesy -->
-          <div style="margin-bottom:14px">
-            <label style="display:block;margin-bottom:8px">1. Procesy produkcyjne</label>
-            <div v-for="(proc, idx) in quoteModal.processes" :key="idx"
-                 style="display:flex;gap:8px;margin-bottom:6px;align-items:center">
-              <input type="text" v-model="proc.name" placeholder="Nazwa procesu (np. Cięcie plazmą)"
-                     style="flex:2;font-size:0.85rem">
-              <input type="number" v-model.number="proc.cost" placeholder="PLN" min="0"
-                     style="flex:1;font-size:0.85rem;max-width:110px">
-              <button @click="quoteModal.processes.splice(idx,1)"
-                      style="border:none;background:none;cursor:pointer;color:var(--rcm-red);font-size:1.2rem;padding:4px;line-height:1">×</button>
+          <!-- ═══ SEKCJA 2: OPERACJE ═══════════════════════════════════════ -->
+          <div style="border:1.5px solid var(--border);border-radius:var(--radius);margin-bottom:14px;overflow:hidden">
+            <div style="background:var(--rcm-blue);color:#fff;font-size:0.72rem;font-weight:700;letter-spacing:0.1em;text-transform:uppercase;padding:8px 14px">
+              ⚙️ 2. Operacje (Wiertarka, Plazma, Spawanie…)
             </div>
-            <button class="btn btn-outline btn-sm" @click="quoteModal.processes.push({name:'',cost:0})">
-              + Dodaj proces
-            </button>
-          </div>
-
-          <!-- Materiał + Waga robocza -->
-          <div class="form-row">
-            <div class="form-group">
-              <label>2. Zakup materiału (PLN)</label>
-              <input type="number" v-model.number="quoteModal.material_cost" min="0" step="10">
-            </div>
-            <div class="form-group">
-              <label>3. Waga robocza (kg)</label>
-              <input type="number" v-model.number="quoteModal.weight_kg" min="0" step="0.5">
-              <span class="field-hint">Waga dla kalkulacji kosztu materiałowego</span>
-            </div>
-          </div>
-
-          <!-- Stawka za kg — złożoność -->
-          <div style="margin-bottom:14px">
-            <label style="display:block;margin-bottom:6px">
-              Stawka robocza za kg — złożoność:
-              <strong style="color:var(--rcm-blue);font-family:'DM Mono',monospace">{{ quoteModal.weight_rate_pln_kg }} PLN/kg</strong>
-            </label>
-            <div style="display:flex;align-items:center;gap:10px">
-              <span style="font-size:0.75rem;color:var(--muted)">7 (proste)</span>
-              <input type="range" v-model.number="quoteModal.weight_rate_pln_kg" min="7" max="30" step="0.5"
-                     style="flex:1;accent-color:var(--rcm-blue);height:4px">
-              <span style="font-size:0.75rem;color:var(--muted)">30 (złożone)</span>
-            </div>
-            <div class="field-hint" style="margin-top:6px">
-              = {{ Math.round(quoteModal.weight_kg * quoteModal.weight_rate_pln_kg) }} PLN za wagę roboczą
+            <div style="padding:14px">
+              <!-- Nagłówki kolumn -->
+              <div style="display:grid;grid-template-columns:1fr 100px 120px 80px 28px;gap:6px;margin-bottom:6px;font-size:0.72rem;color:var(--muted);font-weight:600;text-transform:uppercase;letter-spacing:0.06em;align-items:center">
+                <span>Operacja</span><span style="text-align:center">Czas (h)</span><span style="text-align:center">Stawka PLN/h</span><span style="text-align:right">= PLN</span><span></span>
+              </div>
+              <div v-for="(proc, idx) in quoteModal.processes" :key="idx"
+                   style="display:grid;grid-template-columns:1fr 100px 120px 80px 28px;gap:6px;margin-bottom:6px;align-items:center">
+                <input type="text" v-model="proc.name" placeholder="np. Cięcie plazmą"
+                       style="font-size:0.85rem">
+                <input type="number" v-model.number="proc.hours" placeholder="0" min="0" step="0.5"
+                       style="font-size:0.85rem;text-align:center">
+                <input type="number" v-model.number="proc.rate_per_hour" placeholder="90" min="0" step="10"
+                       style="font-size:0.85rem;text-align:center">
+                <span style="text-align:right;font-size:0.85rem;font-weight:600;color:var(--rcm-blue)">
+                  {{ proc.hours && proc.rate_per_hour ? Math.round(proc.hours * proc.rate_per_hour) : (proc.cost || 0) }} PLN
+                </span>
+                <button @click="quoteModal.processes.splice(idx,1)"
+                        style="border:none;background:none;cursor:pointer;color:var(--rcm-red);font-size:1.1rem;padding:2px;line-height:1">×</button>
+              </div>
+              <div style="display:flex;gap:8px;margin-top:8px;flex-wrap:wrap">
+                <button class="btn btn-outline btn-sm" @click="quoteModal.processes.push({name:'Cięcie plazmą',hours:0,rate_per_hour:150,cost:0})">+ Plazma</button>
+                <button class="btn btn-outline btn-sm" @click="quoteModal.processes.push({name:'Wiercenie/Frezowanie',hours:0,rate_per_hour:120,cost:0})">+ Wiertarka</button>
+                <button class="btn btn-outline btn-sm" @click="quoteModal.processes.push({name:'Spawanie MIG/MAG',hours:0,rate_per_hour:90,cost:0})">+ Spawanie</button>
+                <button class="btn btn-outline btn-sm" @click="quoteModal.processes.push({name:'',hours:0,rate_per_hour:90,cost:0})">+ Inna</button>
+              </div>
+              <!-- Robocizna dodatkowa -->
+              <div class="form-group" style="margin-top:12px;max-width:220px">
+                <label>Robocizna dodatkowa (h)
+                  <span style="font-size:0.72rem;font-weight:400;color:var(--muted)">montaż, wykończenie</span>
+                </label>
+                <input type="number" v-model.number="quoteModal.labor_hours" min="0" step="0.5" placeholder="0"
+                       style="max-width:120px">
+                <span class="field-hint">= {{ Math.round((quoteModal.labor_hours||0)*(settings.labor_rate_pln||90)) }} PLN @ {{ settings.labor_rate_pln||90 }} PLN/h</span>
+              </div>
             </div>
           </div>
 
-          <!-- Czas spawania -->
-          <div class="form-row">
-            <div class="form-group">
-              <label>4. Czas spawania (godz.)</label>
-              <input type="number" v-model.number="quoteModal.welding_hours" min="0" step="0.5">
-              <span class="field-hint">= {{ Math.round(quoteModal.welding_hours * (settings.labor_rate_pln || 90)) }} PLN @ {{ settings.labor_rate_pln || 90 }} PLN/h</span>
+          <!-- ═══ SEKCJA 3: PODSUMOWANIE ════════════════════════════════════ -->
+          <div style="border:1.5px solid var(--border);border-radius:var(--radius);margin-bottom:14px;overflow:hidden">
+            <div style="background:var(--rcm-blue);color:#fff;font-size:0.72rem;font-weight:700;letter-spacing:0.1em;text-transform:uppercase;padding:8px 14px">
+              💰 3. Podsumowanie i Marża
             </div>
-            <div class="form-group">
-              <label>Robocizna dodatkowa (godz.)</label>
-              <input type="number" v-model.number="quoteModal.labor_hours" min="0" step="0.5">
-              <span class="field-hint">Obróbka, montaż poza spawaniem</span>
-            </div>
-          </div>
-
-          <!-- Overhead + marża -->
-          <div class="form-row">
-            <div class="form-group">
-              <label>5. Overhead (%)</label>
-              <input type="number" v-model.number="quoteModal.overhead_pct" min="0" max="1" step="0.05">
-            </div>
-            <div class="form-group">
-              <label>Marża (%)</label>
-              <input type="number" v-model.number="quoteModal.margin_pct" min="0" max="2" step="0.05">
+            <div style="padding:14px;display:flex;flex-direction:column;gap:10px">
+              <div class="form-row">
+                <div class="form-group">
+                  <label>Overhead / Narzuty (%)</label>
+                  <input type="number" v-model.number="quoteModal.overhead_pct" min="0" max="1" step="0.05">
+                  <span class="field-hint">Energia, amortyzacja maszyn (domyślnie 10%)</span>
+                </div>
+                <div class="form-group">
+                  <label>Marża handlowa (%)</label>
+                  <input type="number" v-model.number="quoteModal.margin_pct" min="0" max="2" step="0.05">
+                  <span class="field-hint">Zysk firmy (domyślnie 25%)</span>
+                </div>
+              </div>
+              <div class="form-group" style="max-width:240px">
+                <label>Transport / dostawa (PLN)
+                  <span style="font-size:0.72rem;font-weight:400;color:var(--muted)">— bez narzutu</span>
+                </label>
+                <input type="number" v-model.number="quoteModal.transport_cost" min="0" step="50" placeholder="0">
+              </div>
+              <!-- Checkbox: pokaż ceny na ofercie -->
+              <label style="display:flex;align-items:center;gap:8px;cursor:pointer;font-size:0.85rem;padding:8px;border:1px solid var(--border);border-radius:6px;background:var(--bg)">
+                <input type="checkbox" v-model="quoteModal.show_unit_prices">
+                <span>Pokaż ceny operacji na ofercie dla klienta</span>
+              </label>
             </div>
           </div>
 
           <!-- ▸ LIVE BREAKDOWN ─────────────────────────────────────────── -->
           <div class="breakdown-panel">
-            <div class="breakdown-row">
-              <span>Procesy</span>
-              <span>{{ Math.round(quoteModal.processes.reduce((s,p)=>s+(+p.cost||0),0)) }} PLN</span>
+            <!-- Operacje -->
+            <div v-for="proc in quoteModal.processes.filter(p=>p.name)" :key="proc.name" class="breakdown-row" style="font-size:0.82rem;color:var(--muted)">
+              <span>{{ proc.name }}</span>
+              <span>{{ proc.hours && proc.rate_per_hour ? Math.round(proc.hours*proc.rate_per_hour) : (proc.cost||0) }} PLN</span>
             </div>
-            <div class="breakdown-row">
+            <div v-if="quoteModal.labor_hours > 0" class="breakdown-row" style="font-size:0.82rem;color:var(--muted)">
+              <span>Robocizna dodatkowa</span>
+              <span>{{ Math.round(quoteModal.labor_hours*(settings.labor_rate_pln||90)) }} PLN</span>
+            </div>
+            <!-- Materiał -->
+            <div class="breakdown-row" style="font-size:0.82rem;color:var(--muted)">
               <span>Materiał</span>
-              <span>{{ Math.round(quoteModal.material_cost||0) }} PLN</span>
+              <span>{{ quoteModal.material_price_per_kg > 0 ? Math.round(quoteModal.material_weight_kg*quoteModal.material_price_per_kg) : Math.round(quoteModal.material_cost||0) }} PLN</span>
             </div>
-            <div class="breakdown-row">
-              <span>Waga × stawka</span>
-              <span>{{ Math.round((quoteModal.weight_kg||0)*(quoteModal.weight_rate_pln_kg||0)) }} PLN</span>
-            </div>
-            <div class="breakdown-row">
-              <span>Spawanie + robocizna</span>
-              <span>{{ Math.round(((quoteModal.welding_hours||0)+(quoteModal.labor_hours||0))*(settings.labor_rate_pln||90)) }} PLN</span>
+            <div v-if="quoteModal.transport_cost > 0" class="breakdown-row" style="font-size:0.82rem;color:var(--muted)">
+              <span>Transport</span>
+              <span>{{ Math.round(quoteModal.transport_cost) }} PLN</span>
             </div>
             <div class="breakdown-row total">
               <span>Cena netto</span>
-              <span>{{ calcQuoteStructured() }} PLN</span>
+              <span>{{ calcQuoteStructured().toLocaleString('pl-PL') }} PLN</span>
             </div>
-            <template v-if="quoteModal.weight_netto_kg > 0">
-              <div class="breakdown-row pln-kg">
-                <span style="color:var(--muted)">Cena za kilogram netto</span>
-                <span :style="{
-                  fontWeight:'700', fontFamily:'\'DM Mono\',monospace',
-                  color: calcQuoteStructured()/quoteModal.weight_netto_kg < 15
-                    ? 'var(--rcm-green)'
-                    : calcQuoteStructured()/quoteModal.weight_netto_kg > 40
-                      ? 'var(--rcm-accent)'
-                      : 'var(--rcm-blue)'
-                }">{{ (calcQuoteStructured()/quoteModal.weight_netto_kg).toFixed(1) }} PLN/kg</span>
+            <div class="breakdown-row" style="font-size:0.85rem">
+              <span style="color:var(--muted)">Brutto (+ 23% VAT)</span>
+              <span style="font-weight:700;color:var(--text)">{{ Math.round(calcQuoteStructured()*1.23).toLocaleString('pl-PL') }} PLN</span>
+            </div>
+            <template v-if="(quoteModal.order?.quantity||1) > 1">
+              <div class="breakdown-row" style="font-size:0.82rem">
+                <span style="color:var(--muted)">Za sztukę netto (×{{ quoteModal.order.quantity }})</span>
+                <span style="font-weight:600;color:var(--rcm-blue)">{{ Math.round(calcQuoteStructured()/quoteModal.order.quantity) }} PLN/szt.</span>
+              </div>
+            </template>
+            <!-- PLN/kg — BIG display -->
+            <template v-if="quoteModal.material_weight_kg > 0 && calcQuoteStructured() > 0">
+              <div class="breakdown-row pln-kg" style="padding:10px 14px">
+                <span style="color:var(--muted);font-size:0.8rem">Cena za kg surowca</span>
+                <span style="font-size:1.5rem;font-weight:900;font-family:'DM Mono',monospace"
+                      :style="{color: calcQuoteStructured()/quoteModal.material_weight_kg < 15 ? 'var(--rcm-green)' : calcQuoteStructured()/quoteModal.material_weight_kg > 50 ? 'var(--rcm-accent)' : 'var(--rcm-blue)'}">
+                  {{ (calcQuoteStructured()/quoteModal.material_weight_kg).toFixed(1) }} PLN/kg
+                </span>
               </div>
             </template>
           </div>
@@ -1470,16 +1620,19 @@
         </template>
 
         <!-- Akcje -->
-        <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:4px">
+        <div style="display:flex;gap:10px;flex-wrap:wrap;margin-top:20px;padding-top:16px;border-top:1px solid var(--border)">
           <button class="btn btn-success" @click="submitQuote">✅ Zatwierdź wycenę</button>
           <button class="btn btn-outline" @click="quoteModal.show=false">Anuluj</button>
         </div>
 
         <!-- Po zapisie: możliwość zapisania jako szablon -->
         <div v-if="quoteModal.savedQuote"
-             style="margin-top:14px;padding:12px;background:#e8f5e9;border-radius:var(--radius);border:1px solid var(--rcm-green)">
-          <div style="font-weight:600;color:var(--rcm-green);margin-bottom:8px">
-            ✅ Wycena zapisana — {{ quoteModal.savedQuote.total_net }} PLN netto
+             style="margin-top:16px;padding:14px 16px;background:#e8f5e9;border-radius:var(--radius);border:1px solid var(--rcm-green)">
+          <div style="font-weight:600;color:var(--rcm-green);margin-bottom:6px;font-size:1rem">
+            ✅ Wycena {{ quoteModal.savedQuote.last_edited_at ? 'zaktualizowana' : 'zapisana' }} — {{ quoteModal.savedQuote.total_net }} PLN netto
+          </div>
+          <div v-if="quoteModal.savedQuote.last_edited_at" style="font-size:0.78rem;color:var(--muted);margin-bottom:10px">
+            {{ new Date(quoteModal.savedQuote.last_edited_at + 'Z').toLocaleString('pl-PL') }}
           </div>
           <div style="font-size:0.85rem;color:var(--muted);margin-bottom:8px">
             Jeśli to zlecenie się powtórzy — zapisz jako szablon SOP (trafi do Katalogu Standard).
@@ -1611,6 +1764,7 @@ createApp({
     const templates   = ref([])
     const analytics   = ref(null)
     const harmonogram = ref([])
+    const approvedMaterials = ref([])  // whitelist materiałów
     const triageResult = ref(null)
     const triageError  = ref(null)   // komunikat błędu przy submitcie
     const triageLoading = ref(false) // spinner na przycisku
@@ -1622,6 +1776,8 @@ createApp({
     const orderAttachments  = ref({})  // {order_id: [AttachmentOut, ...]}
     const expandedAttachments = ref(null) // ID zlecenia z otwartym panelem załączników
     const settings          = ref({ labor_rate_pln: 90 }) // stawki z /api/settings
+    const benchmarkData     = ref(null)  // wynik GET /api/benchmarks/price-per-kg
+    const benchmarkFilters  = ref({ material: "", order_type: "" })  // filtry dla benchmark
 
     // Wizard form
     const wStep = ref(1)
@@ -1639,13 +1795,18 @@ createApp({
     const detailsModal = ref({ show:false, order:null, editMode:false, form:{} })
     const quoteModal = ref({
       show:false, order:null, mode:'structured',
-      // v2 fields
-      processes:[], material_cost:0,
-      weight_kg:0, weight_rate_pln_kg:15,
-      welding_hours:0, labor_hours:0,
+      // v3 fields — cleaner formula
+      processes:[], // [{name, hours, rate_per_hour, cost}]
+      material_weight_kg:0, material_price_per_kg:0,
+      material_cost:0,        // legacy fallback
       weight_netto_kg:0, weight_brutto_kg:0,
+      labor_hours:0,
       overhead_pct:0.1, margin_pct:0.25,
-      target_pln_kg:0,  // kompas cenowy — docelowa cena wyjściowa za kg
+      transport_cost:0,
+      show_unit_prices:true,
+      // backward compat
+      weight_kg:0, weight_rate_pln_kg:0,
+      welding_hours:0,
       savedQuote: null,
     })
     const zaporModal = ref({ show:false, order:null, material_cost:0, hours_estimate:1 })
@@ -1668,6 +1829,7 @@ createApp({
         tab.value = { biuro: "wizard", technolog: "queue", dyrektor: "analytics" }[user.role]
         if (tab.value !== "wizard") loadOrders()
         if (tab.value === "analytics") loadAnalytics()
+        loadApprovedMaterials()
       } else {
         loginError.value = true
       }
@@ -1724,6 +1886,10 @@ createApp({
       orders.value = all.filter(o => o.status !== "cancelled")  // ukryj anulowane
     }
 
+    async function loadApprovedMaterials() {
+      approvedMaterials.value = await api("/approved-materials")
+    }
+
     async function deleteOrder(order) {
       if (!confirm(`Usunąć zlecenie #${order.order_number}?\nMożna przywrócić ręcznie z bazy.`)) return
       await api(`/orders/${order.id}`, { method: "DELETE" })
@@ -1751,6 +1917,18 @@ createApp({
     }
     async function loadHarmonogram() {
       harmonogram.value = await api("/harmonogram")
+    }
+    async function loadBenchmark() {
+      try {
+        const params = new URLSearchParams()
+        if (benchmarkFilters.value.material) params.append("material", benchmarkFilters.value.material)
+        if (benchmarkFilters.value.order_type) params.append("order_type", benchmarkFilters.value.order_type)
+        const qs = params.toString() ? `?${params.toString()}` : ""
+        benchmarkData.value = await api(`/benchmarks/price-per-kg${qs}`)
+      } catch (e) {
+        console.error("Błąd ładowania benchmarku:", e)
+        benchmarkData.value = null
+      }
     }
     async function loadSettings() {
       // Pobierz stawki z bazy — labor_rate_pln itp.
@@ -1787,16 +1965,19 @@ createApp({
       return Math.round(sub * (1 + m.margin_pct))
     }
 
-    // ── Oblicz podgląd wyceny (v2 — strukturalna) ─────────────────────────
+    // ── Oblicz podgląd wyceny (v3 — Gemini formula) ──────────────────────
     function calcQuoteStructured() {
       const m    = quoteModal.value
       const rate = settings.value.labor_rate_pln || 90
-      const proc   = (m.processes||[]).reduce((s,p) => s + (+p.cost||0), 0)
-      const weight = (+m.weight_kg||0) * (+m.weight_rate_pln_kg||0)
-      const weld   = (+m.welding_hours||0) * rate
-      const extra  = (+m.labor_hours||0) * rate
-      const base   = proc + (+m.material_cost||0) + weight + weld + extra
-      return Math.round(base * (1 + (+m.overhead_pct||0)) * (1 + (+m.margin_pct||0)))
+      const ops = (m.processes||[]).reduce((s,p) => {
+        return s + (p.hours && p.rate_per_hour ? p.hours * p.rate_per_hour : (+p.cost||0))
+      }, 0)
+      const mat = (+m.material_price_per_kg||0) > 0
+        ? (+m.material_weight_kg||0) * (+m.material_price_per_kg||0)
+        : (+m.material_cost||0)
+      const extra = (+m.labor_hours||0) * rate
+      const base  = ops + mat + extra
+      return Math.round(base * (1+(+m.overhead_pct||0)) * (1+(+m.margin_pct||0)) + (+m.transport_cost||0))
     }
 
     // ── Modal handlers ────────────────────────────────────────────────────
@@ -1839,16 +2020,39 @@ createApp({
       detailsModal.value.editMode = false
       await loadOrders()
     }
-    function openQuoteModal(o) {
-      quoteModal.value = {
+    async function openQuoteModal(o) {
+      const defaults = {
         show:true, order:o, mode:'structured', savedQuote:null,
-        processes:[], material_cost:0,
-        weight_kg:0, weight_rate_pln_kg:15,
-        welding_hours:0, labor_hours:0,
-        weight_netto_kg:0, weight_brutto_kg:0,
-        overhead_pct:0.1, margin_pct:0.25,
-        target_pln_kg:0,
+        processes:[], material_weight_kg:0, material_price_per_kg:0,
+        material_cost:0, weight_netto_kg:0, weight_brutto_kg:0,
+        labor_hours:0, overhead_pct:0.1, margin_pct:0.25,
+        transport_cost:0, show_unit_prices:true,
+        weight_kg:0, weight_rate_pln_kg:0, welding_hours:0,
       }
+      // quoted/in_production — załaduj istniejącą wycenę do formularza
+      if (['quoted','in_production'].includes(o.status)) {
+        try {
+          const q = await api(`/orders/${o.id}/quote`)
+          quoteModal.value = {
+            ...defaults,
+            mode: (q.estimate_version === 'v2' || q.estimate_version === 'v3') ? 'structured' : 'simple',
+            processes:              Array.isArray(q.processes_json) ? q.processes_json.map(p=>({...p})) : [],
+            material_weight_kg:     +(q.material_weight_kg    || 0),
+            material_price_per_kg:  +(q.material_price_per_kg || 0),
+            material_cost:          +(q.material_cost         || 0),
+            weight_netto_kg:        +(q.weight_netto_kg       || 0),
+            weight_brutto_kg:       +(q.weight_brutto_kg      || 0),
+            labor_hours:            +(q.labor_hours            || 0),
+            overhead_pct:           +(q.overhead_pct           || 0.10),
+            margin_pct:             +(q.margin_pct             || 0.25),
+            transport_cost:         +(q.transport_cost         || 0),
+            show_unit_prices:       q.show_unit_prices !== false,
+            savedQuote: q,
+          }
+          return
+        } catch(_) { /* brak wyceny — otwórz pusty formularz */ }
+      }
+      quoteModal.value = defaults
     }
     function openZaporModal(o) {
       zaporModal.value = { show:true, order:o, material_cost:0, hours_estimate:1 }
@@ -1865,16 +2069,17 @@ createApp({
         q = await api(`/orders/${m.order.id}/quote/structured`, {
           method: "POST",
           body: {
-            processes:          m.processes,
-            material_cost:      m.material_cost,
-            weight_kg:          m.weight_kg,
-            weight_rate_pln_kg: m.weight_rate_pln_kg,
-            welding_hours:      m.welding_hours,
-            labor_hours:        m.labor_hours,
-            weight_netto_kg:    m.weight_netto_kg,
-            weight_brutto_kg:   m.weight_brutto_kg,
-            overhead_pct:       m.overhead_pct,
-            margin_pct:         m.margin_pct,
+            processes:             m.processes,
+            material_weight_kg:    m.material_weight_kg   || 0,
+            material_price_per_kg: m.material_price_per_kg|| 0,
+            material_cost:         m.material_cost        || 0,
+            weight_netto_kg:       m.weight_netto_kg      || 0,
+            weight_brutto_kg:      m.weight_brutto_kg     || 0,
+            labor_hours:           m.labor_hours          || 0,
+            overhead_pct:          m.overhead_pct,
+            margin_pct:            m.margin_pct,
+            transport_cost:        m.transport_cost       || 0,
+            show_unit_prices:      m.show_unit_prices,
           }
         })
       } else {
@@ -2045,6 +2250,8 @@ createApp({
       showNewTemplate, newTemplate,
       sopLibrary, paramQuestions,
       settings,
+      approvedMaterials, loadApprovedMaterials,
+      benchmarkData, benchmarkFilters, loadBenchmark,
       nonstandardOrders, catalogPrice, onTemplateChange,
       login, logout, resetWizard, selectType,
       pytania, answerDraft, pendingCount, orderParams, expandedParams,

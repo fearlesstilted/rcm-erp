@@ -371,26 +371,26 @@ class TestStructuredQuote:
         assert resp.status_code == 201
         data = resp.json()
         assert data["total_net"] > 0
-        assert data["estimate_version"] == "v2"
+        assert data["estimate_version"] == "v3"
 
     def test_structured_quote_formula(self, client, db_session):
-        """Verify the formula: (processes + material + weight*rate + welding*rate) * overhead * margin."""
+        """Verify v3 formula: (ops_total + material_total + extra_labor) * overhead * margin."""
         seed_setting(db_session, "labor_rate_pln", "100")
         order_id = create_order(client, has_drawing=False).json()["id"]
         client.post(f"/api/orders/{order_id}/triage")
 
         resp = client.post(f"/api/orders/{order_id}/quote/structured", json={
-            "processes": [{"name": "CNC", "cost": 200.0}],
-            "material_cost": 400.0,
-            "weight_kg": 10.0,
-            "weight_rate_pln_kg": 20.0,         # 10 * 20 = 200
-            "welding_hours": 2.0,                # 2 * 100 = 200
+            # ops: hours × rate = 3h × 100 PLN/h = 300
+            "processes": [{"name": "Spawanie", "hours": 3.0, "rate_per_hour": 100.0, "cost": 0}],
+            # material: 20 kg × 20 PLN/kg = 400
+            "material_weight_kg": 20.0,
+            "material_price_per_kg": 20.0,
             "labor_hours": 0.0,
             "overhead_pct": 0.0,
             "margin_pct": 0.0,
         })
-        # base = 200 + 400 + 200 + 200 = 1000, overhead=0, margin=0 → 1000
-        assert resp.json()["total_net"] == 1000.0
+        # base = 300 + 400 = 700, overhead=0, margin=0 → 700
+        assert resp.json()["total_net"] == 700.0
 
     def test_structured_quote_flips_status_to_quoted(self, client, db_session):
         """After saving structured quote, order.status must become 'quoted'."""
@@ -414,6 +414,43 @@ class TestStructuredQuote:
         # GET should return the updated price
         q = client.get(f"/api/orders/{order_id}/quote").json()
         assert q["material_cost"] == 999.0
+
+    def test_quote_edit_preserves_quoted_status(self, client, db_session):
+        """Editing a quote after first save must NOT demote/change status."""
+        order_id = self._niestandard_order_id(client, db_session)
+        base = {"processes": [], "material_cost": 100.0, "weight_kg": 0,
+                "weight_rate_pln_kg": 15, "welding_hours": 0}
+        client.post(f"/api/orders/{order_id}/quote/structured", json=base)
+        # Status is now 'quoted'; second save = edit
+        base["material_cost"] = 777.0
+        resp = client.post(f"/api/orders/{order_id}/quote/structured", json=base)
+        assert resp.status_code == 201
+        order = client.get(f"/api/orders/{order_id}").json()
+        assert order["status"] == "quoted"
+
+    def test_quote_edit_updates_last_edited_at(self, client, db_session):
+        """last_edited_at must be set on each save and move forward on edit."""
+        order_id = self._niestandard_order_id(client, db_session)
+        base = {"processes": [], "material_cost": 100.0, "weight_kg": 0,
+                "weight_rate_pln_kg": 15, "welding_hours": 0}
+        first = client.post(f"/api/orders/{order_id}/quote/structured", json=base).json()
+        assert first.get("last_edited_at") is not None
+        base["material_cost"] = 200.0
+        second = client.post(f"/api/orders/{order_id}/quote/structured", json=base).json()
+        assert second["last_edited_at"] >= first["last_edited_at"]
+
+    def test_quote_edit_allowed_in_in_production(self, client, db_session):
+        """Wycena editable even after confirm → in_production."""
+        order_id = self._niestandard_order_id(client, db_session)
+        base = {"processes": [], "material_cost": 100.0, "weight_kg": 0,
+                "weight_rate_pln_kg": 15, "welding_hours": 0}
+        client.post(f"/api/orders/{order_id}/quote/structured", json=base)
+        client.post(f"/api/orders/{order_id}/confirm")  # quoted → in_production
+        base["material_cost"] = 555.0
+        resp = client.post(f"/api/orders/{order_id}/quote/structured", json=base)
+        assert resp.status_code == 201
+        order = client.get(f"/api/orders/{order_id}").json()
+        assert order["status"] == "in_production"
 
 
 # ─── Status transitions ───────────────────────────────────────────────────────
@@ -600,6 +637,36 @@ class TestPatchOrder:
 
 # ─── XLSX export ──────────────────────────────────────────────────────────────
 
+# ─── Approved Materials CRUD ─────────────────────────────────────────────────
+
+class TestApprovedMaterials:
+    def test_list_empty(self, client):
+        resp = client.get("/api/approved-materials")
+        assert resp.status_code == 200
+        assert resp.json() == []
+
+    def test_create_material(self, client):
+        resp = client.post("/api/approved-materials", json={"name": "S235", "category": "stal"})
+        assert resp.status_code == 201
+        assert resp.json()["name"] == "S235"
+
+    def test_list_returns_created(self, client):
+        client.post("/api/approved-materials", json={"name": "S355"})
+        resp = client.get("/api/approved-materials")
+        assert any(m["name"] == "S355" for m in resp.json())
+
+    def test_duplicate_rejected(self, client):
+        client.post("/api/approved-materials", json={"name": "S235"})
+        resp = client.post("/api/approved-materials", json={"name": "S235"})
+        assert resp.status_code == 409
+
+    def test_soft_delete(self, client):
+        r = client.post("/api/approved-materials", json={"name": "TestMat"}).json()
+        client.delete(f"/api/approved-materials/{r['id']}")
+        names = [m["name"] for m in client.get("/api/approved-materials").json()]
+        assert "TestMat" not in names
+
+
 class TestExport:
     def test_xlsx_export_returns_file(self, client, db_session):
         """GET /api/export/xlsx returns an Excel file with correct content-type."""
@@ -613,3 +680,69 @@ class TestExport:
         """Export works even with no orders."""
         resp = client.get("/api/export/xlsx")
         assert resp.status_code == 200
+
+
+# ─── BENCHMARKS ────────────────────────────────────────────────────────────────
+
+class TestBenchmarks:
+    def test_benchmark_empty_returns_warning(self, client):
+        """GET /benchmarks/price-per-kg with no records returns warning."""
+        resp = client.get("/api/benchmarks/price-per-kg?material=unknown&order_type=remont")
+        assert resp.status_code == 200
+        data = resp.json()
+        assert data["count"] == 0
+        assert data["warning"] is not None
+        assert "Brak danych" in data["warning"] or "Недостаточно" in data["warning"]
+
+    def test_benchmark_confirms_record_price_history(self, client, db_session):
+        """POST /confirm saves PriceHistory snapshot with PLN/kg calculation."""
+        # Utwórz zlecenie + wycenę
+        seed_setting(db_session)
+        order_id = create_order(client, material="S235", has_drawing=False).json()["id"]
+        client.post(f"/api/orders/{order_id}/triage")
+        quote_payload = {
+            "material_weight_kg": 20.0,
+            "material_price_per_kg": 5.0,
+            "processes": [{"name": "Cięcie", "hours": 2.0, "rate_per_hour": 50.0}],
+            "overhead_pct": 0.10,
+            "margin_pct": 0.25,
+        }
+        client.post(f"/api/orders/{order_id}/quote/structured", json=quote_payload)
+
+        # Potwierdź zlecenie → powinno zapisać PriceHistory
+        resp = client.post(f"/api/orders/{order_id}/confirm")
+        assert resp.status_code == 200
+
+        # Sprawdź PriceHistory — powinny być dane z wyceny
+        from sqlalchemy import text
+        result = db_session.execute(text("SELECT parameters_json FROM price_history LIMIT 1"))
+        row = result.fetchone()
+        assert row is not None, "PriceHistory should have been recorded"
+
+    def test_benchmark_aggregates_by_material(self, client, db_session):
+        """GET /benchmarks/price-per-kg aggregates multiple quotes by material."""
+        from models import PriceHistory
+        from datetime import date
+
+        # Wstaw ręcznie kilka próbek w PriceHistory
+        for i in range(3):
+            h = PriceHistory(
+                order_type="remont",
+                total_price_historical=1000.0 + (i * 100),
+                parameters_json={"weight_kg": 10.0, "pln_kg": 100.0 + i, "material": "S235"},
+                order_date=date.today(),
+                client="Client A",
+            )
+            db_session.add(h)
+        db_session.commit()
+
+        # Zapytaj benchmark dla S235
+        resp = client.get("/api/benchmarks/price-per-kg?material=S235")
+        assert resp.status_code == 200
+        data = resp.json()
+        assert data["count"] == 3
+        assert data["warning"] is None  # ≥3 próbek
+        # avg powinno być ~100 (średnia 100, 101, 102)
+        assert 100 <= data["avg_pln_kg"] <= 102
+        assert data["min_pln_kg"] == 100
+        assert data["max_pln_kg"] == 102

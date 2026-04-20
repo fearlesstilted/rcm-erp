@@ -19,7 +19,7 @@ from sqlalchemy.orm import Session
 import re
 from models import (
     Base, ConstraintRule, ProductTemplate, PriceHistory,
-    User, UserRole, Setting, init_db
+    User, UserRole, Setting, ApprovedMaterial, init_db
 )
 
 CENY_DIR = os.path.join(os.path.dirname(__file__), "..", "..", "ceny")
@@ -480,6 +480,25 @@ def seed_price_history_from_xlsx(db: Session):
         print(f"✓ {imported} rekordów price_history z {fname}")
 
 
+def seed_approved_materials(db: Session):
+    """Whitelist zatwierdzonych materiałów — 8 podstawowych dla RCM."""
+    if db.query(ApprovedMaterial).count() > 0:
+        return
+    materials = [
+        ApprovedMaterial(name="S235",             category="stal",       default_rate_pln_kg=15),
+        ApprovedMaterial(name="S355",             category="stal",       default_rate_pln_kg=16),
+        ApprovedMaterial(name="S235JR",           category="stal",       default_rate_pln_kg=15),
+        ApprovedMaterial(name="stal nierdzewna",  category="nierdzewka", default_rate_pln_kg=22, notes="tylko po uzgodnieniu z Dyrektorem"),
+        ApprovedMaterial(name="nierdzewka 304",   category="nierdzewka", default_rate_pln_kg=22),
+        ApprovedMaterial(name="żeliwo",           category="żeliwo",     default_rate_pln_kg=18),
+        ApprovedMaterial(name="stal konstrukcyjna", category="stal",     default_rate_pln_kg=15),
+        ApprovedMaterial(name="P265GH",           category="stal",       default_rate_pln_kg=17, notes="ciśnieniowa"),
+    ]
+    db.add_all(materials)
+    db.commit()
+    print(f"✓ {len(materials)} zatwierdzonych materiałów wstawionych")
+
+
 if __name__ == "__main__":
     engine = init_db()
     with Session(engine) as db:
@@ -487,5 +506,6 @@ if __name__ == "__main__":
         seed_constraint_rules(db)
         seed_product_templates(db)
         seed_settings(db)
+        seed_approved_materials(db)
         seed_price_history_from_xlsx(db)
     print("\n✅ Seed zakończony. Baza gotowa.")

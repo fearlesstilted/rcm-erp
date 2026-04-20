@@ -24,7 +24,7 @@ from unittest.mock import MagicMock, patch
 import pytest
 
 from triage import run_triage, TriageInput, TriageResult
-from models import ConstraintRule, ProductTemplate
+from models import ConstraintRule, ProductTemplate, ApprovedMaterial
 
 
 # ─── Helpers ─────────────────────────────────────────────────────────────────
@@ -52,26 +52,36 @@ def make_template(id, name, category="remont"):
     return t
 
 
-def make_db(rules=None, templates=None):
-    """Return a mock Session that returns the given rules and templates."""
+def make_approved_material(name, category="stal"):
+    m = ApprovedMaterial()
+    m.name = name
+    m.category = category
+    m.is_active = True
+    return m
+
+
+def make_db(rules=None, templates=None, approved_materials=None):
+    """Return a mock Session that returns the given rules, templates, and approved_materials."""
     db = MagicMock()
 
-    # db.query(ConstraintRule).filter(...).all() → rules
-    # db.query(ProductTemplate).filter(...).first() → first matching template
     rules = rules or []
     templates = templates or []
+    # None = table is empty (no whitelist enforced); [] = table exists but empty (warns on any material)
+    _approved = approved_materials  # keep None sentinel
 
     def query_side_effect(model):
         mock_query = MagicMock()
         if model is ConstraintRule:
             mock_query.filter.return_value.all.return_value = rules
         elif model is ProductTemplate:
-            # Simulate .filter().filter().first() chaining
             inner = MagicMock()
-            # Return first template for any filter combination (tests set up single matching template)
             inner.first.return_value = templates[0] if templates else None
             mock_query.filter.return_value = inner
             mock_query.filter.return_value.filter.return_value = inner
+        elif model is ApprovedMaterial:
+            inner = MagicMock()
+            inner.all.return_value = _approved if _approved is not None else []
+            mock_query.filter.return_value = inner
         return mock_query
 
     db.query.side_effect = query_side_effect
@@ -249,3 +259,38 @@ class TestPriority:
         result = run_triage(order, make_db(rules=[rule1, rule2]))
         assert result.branch == "odrzut"
         assert result.message == "Powód 1"  # first rule wins
+
+
+# ─── MATERIAL WHITELIST tests ─────────────────────────────────────────────────
+
+class TestMaterialWhitelist:
+    def test_approved_material_no_warn(self):
+        """Material present in whitelist — no warning generated."""
+        approved = [make_approved_material("S235"), make_approved_material("S355")]
+        order = base_order(material="S235", has_drawing=False)
+        result = run_triage(order, make_db(approved_materials=approved))
+        mat_warnings = [w for w in (result.warnings or []) if "materiał" in w.lower() or "material" in w.lower()]
+        assert mat_warnings == []
+
+    def test_unknown_material_adds_warning(self):
+        """Material not in whitelist → warning added, order not rejected."""
+        approved = [make_approved_material("S235"), make_approved_material("S355")]
+        order = base_order(material="mithril-99", has_drawing=False)
+        result = run_triage(order, make_db(approved_materials=approved))
+        assert result.branch != "odrzut"
+        assert any("mithril-99" in w for w in (result.warnings or []))
+
+    def test_empty_whitelist_no_warn(self):
+        """If approved_materials table is empty — no warning (feature not configured)."""
+        order = base_order(material="cokolwiek", has_drawing=False)
+        result = run_triage(order, make_db(approved_materials=[]))
+        mat_warnings = [w for w in (result.warnings or []) if "materiał" in w.lower()]
+        assert mat_warnings == []
+
+    def test_material_whitelist_case_insensitive(self):
+        """Whitelist check is case-insensitive."""
+        approved = [make_approved_material("S235")]
+        order = base_order(material="s235", has_drawing=False)
+        result = run_triage(order, make_db(approved_materials=approved))
+        mat_warnings = [w for w in (result.warnings or []) if "s235" in w.lower()]
+        assert mat_warnings == []

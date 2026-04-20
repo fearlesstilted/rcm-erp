@@ -20,6 +20,7 @@ class OrderStatus(str, enum.Enum):
     draft         = "draft"
     triage        = "triage"
     standard      = "standard"
+    cancelled     = "cancelled"
     niestandard   = "niestandard"
     quoted        = "quoted"         # Technolog zapisał wycenę, czeka na akceptację Biura
     rejected      = "rejected"
@@ -271,7 +272,13 @@ class Quote(Base):
     welding_hours      = Column(Numeric(8, 2), default=0)
     weight_netto_kg    = Column(Numeric(10, 3), default=0)   # informacyjnie — nie wchodzi do ceny
     weight_brutto_kg   = Column(Numeric(10, 3), default=0)   # informacyjnie — nie wchodzi do ceny
-    estimate_version   = Column(String(10), default="v1")    # v1=legacy, v2=structured
+    estimate_version      = Column(String(10), default="v1")
+    last_edited_at        = Column(DateTime)
+    transport_cost        = Column(Numeric(10, 2), default=0)
+    # --- Wycena strukturalna v3 (Gemini-style: kg×PLN/kg + operacje z hours×rate) ---
+    material_weight_kg    = Column(Numeric(10, 3), default=0)  # kg surowca (np. 50 kg S235)
+    material_price_per_kg = Column(Numeric(6, 2),  default=0)  # cena surowca PLN/kg (np. 3.50)
+    show_unit_prices      = Column(Boolean, default=True)       # czy oferta pokazuje breakdown operacji
 
     order = relationship("Order", back_populates="quote")
 
@@ -374,6 +381,21 @@ class Setting(Base):
     key   = Column(String(50), primary_key=True)   # np. "labor_rate_pln"
     value = Column(String(200), nullable=False)     # np. "90"
     label = Column(String(100))                    # opis dla UI: "Stawka robocizny (PLN/h)"
+
+
+# =============================================================================
+# 16. APPROVED MATERIALS (Whitelist materiałów — zatwierdzonych przez Dyrektora)
+#     Jeśli materiał zlecenia nie pasuje do żadnej pozycji → Triage ostrzega.
+# =============================================================================
+class ApprovedMaterial(Base):
+    __tablename__ = "approved_materials"
+
+    id                  = Column(Integer, primary_key=True)
+    name                = Column(String(100), unique=True, nullable=False)  # "S235", "nierdzewka 304"
+    category            = Column(String(50))          # "stal", "aluminium", "żeliwo"
+    default_rate_pln_kg = Column(Numeric(6, 2))       # domyślna stawka/kg dla wyceny
+    is_active           = Column(Boolean, default=True)
+    notes               = Column(Text)
 
 
 # =============================================================================

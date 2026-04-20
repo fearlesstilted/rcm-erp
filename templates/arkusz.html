@@ -3,375 +3,530 @@
 <head>
 <meta charset="UTF-8">
 <style>
-  /* ── Reset + zmienne ─────────────────────────────────────── */
   * { box-sizing: border-box; margin: 0; padding: 0; }
   body {
-    font-family: Arial, sans-serif;
-    font-size: 10pt;
-    color: #111;
-    padding: 16mm 14mm;
+    font-family: 'Segoe UI', Arial, sans-serif;
+    font-size: 9.5pt;
+    color: #1a1a2e;
+    background: #fff;
+    padding: 12mm 14mm;
   }
 
-  /* ── Nagłówek ────────────────────────────────────────────── */
+  /* ── Nagłówek ──────────────────────────────────────────── */
   .header {
     display: flex;
     justify-content: space-between;
     align-items: flex-start;
-    border-bottom: 3px solid #1a3a5c;
-    padding-bottom: 8px;
+    border-bottom: 4px solid #1a3a5c;
+    padding-bottom: 10px;
     margin-bottom: 14px;
   }
-  .company-name {
-    font-size: 18pt;
+  .logo-block .company {
+    font-size: 20pt;
     font-weight: 900;
     color: #1a3a5c;
     letter-spacing: -0.5px;
+    line-height: 1;
   }
-  .company-sub {
-    font-size: 8pt;
-    color: #666;
-    margin-top: 2px;
+  .logo-block .tagline {
+    font-size: 7pt;
+    color: #999;
+    text-transform: uppercase;
+    letter-spacing: 0.1em;
+    margin-top: 3px;
   }
-  .doc-title {
-    text-align: right;
-  }
-  .doc-title h1 {
-    font-size: 14pt;
-    font-weight: 700;
-    color: #1a3a5c;
-  }
-  .doc-title .nr {
-    font-size: 11pt;
-    font-weight: 700;
-    color: #e8891a;
-    margin-top: 4px;
-  }
-  .doc-title .date {
-    font-size: 8pt;
-    color: #666;
-    margin-top: 2px;
-  }
-
-  /* ── Sekcje ──────────────────────────────────────────────── */
-  .section {
-    margin-bottom: 12px;
-    page-break-inside: avoid;
-  }
-  .section-title {
-    background: #1a3a5c;
-    color: #fff;
+  .doc-block { text-align: right; }
+  .doc-block .doc-type {
     font-size: 9pt;
     font-weight: 700;
-    padding: 4px 8px;
     text-transform: uppercase;
-    letter-spacing: 0.05em;
-    margin-bottom: 6px;
+    letter-spacing: 0.12em;
+    color: #888;
+  }
+  .doc-block .doc-nr {
+    font-size: 16pt;
+    font-weight: 900;
+    color: #1a3a5c;
+    line-height: 1.1;
+  }
+  .doc-block .doc-date {
+    font-size: 8pt;
+    color: #888;
+    margin-top: 3px;
   }
 
-  /* ── Tabela danych ────────────────────────────────────────── */
-  .info-table {
+  /* ── Sekcje ────────────────────────────────────────────── */
+  .section {
+    margin-bottom: 14px;
+    border: 1.5px solid #dde1e6;
+    border-radius: 5px;
+    overflow: hidden;
+  }
+  .section-header {
+    background: #1a3a5c;
+    color: #fff;
+    font-size: 8pt;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.1em;
+    padding: 6px 12px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+  }
+  .section-header .badge {
+    background: #e8891a;
+    color: #fff;
+    font-size: 7pt;
+    font-weight: 700;
+    padding: 2px 8px;
+    border-radius: 10px;
+    text-transform: none;
+    letter-spacing: 0;
+  }
+  .section-body { padding: 10px 12px; }
+
+  /* ── Tabela danych ─────────────────────────────────────── */
+  .data-table {
     width: 100%;
     border-collapse: collapse;
   }
-  .info-table td {
-    padding: 4px 8px;
-    border: 1px solid #dde1e6;
+  .data-table td {
+    padding: 5px 8px;
+    border-bottom: 1px solid #f0f0f0;
+    font-size: 9pt;
     vertical-align: top;
   }
-  .info-table td.label {
-    background: #f4f6f8;
-    font-weight: 700;
+  .data-table td.lbl {
+    color: #888;
     font-size: 8pt;
-    width: 30%;
-    color: #444;
+    width: 38%;
+    white-space: nowrap;
   }
+  .data-table td.val { font-weight: 600; }
+  .data-table tr:last-child td { border-bottom: none; }
 
-  /* ── Tabela operacji ──────────────────────────────────────── */
+  /* ── Tabela operacji ───────────────────────────────────── */
   .ops-table {
     width: 100%;
     border-collapse: collapse;
     font-size: 9pt;
   }
   .ops-table th {
-    background: #e8f0f8;
-    color: #1a3a5c;
-    font-size: 8pt;
+    background: #f4f6f8;
+    color: #555;
+    font-size: 7.5pt;
     font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
     padding: 5px 8px;
-    border: 1px solid #dde1e6;
     text-align: left;
+    border-bottom: 1px solid #dde1e6;
   }
   .ops-table td {
-    padding: 5px 8px;
-    border: 1px solid #dde1e6;
+    padding: 7px 8px;
+    border-bottom: 1px solid #f0f0f0;
+    vertical-align: middle;
   }
-  .ops-table tr:nth-child(even) td { background: #f9fafb; }
+  .ops-table tr:last-child td { border-bottom: none; }
+  .ops-table .col-nr   { width: 28px; text-align: center; color: #888; }
+  .ops-table .col-hrs  { width: 60px; text-align: center; }
+  .ops-table .col-rate { width: 80px; text-align: right; color: #555; font-size: 8.5pt; }
+  .op-name { font-weight: 600; }
+  .hrs-badge {
+    background: #e8f4ff;
+    color: #1a3a5c;
+    font-weight: 700;
+    font-size: 8.5pt;
+    padding: 2px 8px;
+    border-radius: 10px;
+  }
 
-  /* ── Bloki SOP ────────────────────────────────────────────── */
-  .sop-list {
-    list-style: none;
-    counter-reset: sop-counter;
+  /* ── Materiały ─────────────────────────────────────────── */
+  .mat-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 9pt;
   }
-  .sop-list li {
-    counter-increment: sop-counter;
+  .mat-table th {
+    background: #f4f6f8;
+    color: #555;
+    font-size: 7.5pt;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    padding: 5px 8px;
+    text-align: left;
+    border-bottom: 1px solid #dde1e6;
+  }
+  .mat-table td {
+    padding: 7px 8px;
+    border-bottom: 1px solid #f0f0f0;
+    font-size: 9pt;
+  }
+  .mat-table tr:last-child td { border-bottom: none; }
+
+  /* ── Alert wizyty ──────────────────────────────────────── */
+  .visit-alert {
+    background: #fff3e0;
+    border: 1.5px solid #e8891a;
+    border-radius: 4px;
+    padding: 7px 12px;
+    font-size: 8.5pt;
+    color: #5d4037;
+    font-weight: 600;
+    margin-bottom: 14px;
+  }
+
+  /* ── Karta kontrolna ───────────────────────────────────── */
+  .qc-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 8px;
+  }
+  .qc-item {
     display: flex;
     align-items: flex-start;
     gap: 8px;
-    padding: 5px 8px;
-    border-bottom: 1px solid #eee;
-    font-size: 9.5pt;
-  }
-  .sop-list li:last-child { border-bottom: none; }
-  .sop-num {
-    min-width: 22px;
-    height: 22px;
-    background: #1a3a5c;
-    color: #fff;
-    border-radius: 50%;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    font-size: 8pt;
-    font-weight: 700;
-    flex-shrink: 0;
-  }
-
-  /* ── Karta Kontrolna ──────────────────────────────────────── */
-  .check-grid {
-    display: grid;
-    grid-template-columns: 1fr 1fr;
-    gap: 6px;
-  }
-  .check-item {
-    display: flex;
-    align-items: center;
-    gap: 8px;
-    padding: 6px 8px;
-    border: 1px solid #dde1e6;
+    padding: 7px 8px;
+    border: 1px solid #edf0f4;
     border-radius: 4px;
+    font-size: 8.5pt;
   }
-  .checkbox {
-    width: 16px;
-    height: 16px;
-    border: 2px solid #1a3a5c;
+  .qc-box {
+    width: 14px;
+    height: 14px;
+    border: 1.5px solid #1a3a5c;
+    border-radius: 2px;
     flex-shrink: 0;
-    display: inline-block;
+    margin-top: 1px;
   }
+  .qc-label { line-height: 1.4; }
+  .qc-label strong { display: block; font-size: 8.5pt; color: #1a3a5c; }
+  .qc-label span { font-size: 7.5pt; color: #888; }
 
-  /* ── Podpisy ──────────────────────────────────────────────── */
-  .signatures {
+  /* ── Podpisy ───────────────────────────────────────────── */
+  .sigs-grid {
     display: grid;
-    grid-template-columns: 1fr 1fr 1fr;
+    grid-template-columns: repeat(3, 1fr);
     gap: 12px;
-    margin-top: 20px;
+    margin-top: 4px;
   }
-  .signature-box {
-    border-top: 1px solid #111;
-    padding-top: 4px;
-    font-size: 8pt;
-    color: #555;
+  .sig-box {
     text-align: center;
+    padding-top: 6px;
+  }
+  .sig-line {
+    border-top: 1.5px solid #1a3a5c;
+    margin-bottom: 4px;
+  }
+  .sig-label {
+    font-size: 7.5pt;
+    color: #666;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+  }
+  .sig-date {
+    font-size: 7pt;
+    color: #aaa;
+    margin-top: 2px;
   }
 
-  /* ── Stopka ───────────────────────────────────────────────── */
+  /* ── Stopka ────────────────────────────────────────────── */
   .footer {
     border-top: 1px solid #dde1e6;
-    margin-top: 16px;
-    padding-top: 6px;
-    font-size: 7.5pt;
-    color: #999;
+    margin-top: 12px;
+    padding-top: 5px;
+    font-size: 7pt;
+    color: #bbb;
     display: flex;
     justify-content: space-between;
   }
 
   @media print {
-    body { padding: 10mm; }
+    body { padding: 8mm 10mm; }
+    .section { page-break-inside: avoid; }
   }
 </style>
 </head>
 <body>
 
-<!-- ═══ NAGŁÓWEK ═══════════════════════════════════════════════ -->
+<!-- ═══ NAGŁÓWEK ════════════════════════════════════════════ -->
 <div class="header">
-  <div>
-    <div class="company-name">RCM Sp. z o.o.</div>
-    <div class="company-sub">ul. Graniczna 3, 19-500 Gołdap &nbsp;|&nbsp; Metalwork &amp; Welding</div>
+  <div class="logo-block">
+    <div class="company">RCM</div>
+    <div class="tagline">Sp. z o.o. · Arkusz Zlecenia Wewnętrznego</div>
   </div>
-  <div class="doc-title">
-    <h1>Arkusz Zlecenia Wewnętrznego</h1>
-    <div class="nr">Nr: {{ order.order_number or ('ZW-' + order.id|string) }}</div>
-    <div class="date">Data wydruku: {{ today }}</div>
+  <div class="doc-block">
+    <div class="doc-type">Zlecenie Nr</div>
+    <div class="doc-nr">{{ order.order_number or ('ZW-' + order.id|string) }}</div>
+    <div class="doc-date">Wydruk: {{ today }}</div>
   </div>
 </div>
 
-<!-- ═══ DANE ZLECENIA ═══════════════════════════════════════════ -->
-<div class="section">
-  <div class="section-title">1. Dane zlecenia</div>
-  <table class="info-table">
-    <tr>
-      <td class="label">Klient</td>
-      <td>{{ order.client }}</td>
-      <td class="label">Termin (graniczny)</td>
-      <td><strong>{{ order.deadline or '—' }}</strong></td>
-    </tr>
-    <tr>
-      <td class="label">Typ zlecenia</td>
-      <td>
-        {% if order.order_type == 'catalog' %}Produkt z katalogu
-        {% elif order.order_type == 'remont' %}Remont / Naprawa
-        {% else %}Nowa część / Projekt{% endif %}
-      </td>
-      <td class="label">Materiał</td>
-      <td>{{ order.material or '—' }}</td>
-    </tr>
-    {% if order.description %}
-    <tr>
-      <td class="label">Opis problemu</td>
-      <td colspan="3">{{ order.description }}</td>
-    </tr>
-    {% endif %}
-    {% if order.requires_visit %}
-    <tr>
-      <td class="label">Uwaga</td>
-      <td colspan="3" style="color:#c62828;font-weight:700">
-        ⚠ Wymaga wizyty u klienta (pomiary na miejscu)
-      </td>
-    </tr>
-    {% endif %}
-    {% if order.notes %}
-    <tr>
-      <td class="label">Uwagi</td>
-      <td colspan="3">{{ order.notes }}</td>
-    </tr>
-    {% endif %}
-  </table>
-</div>
-
-<!-- WYCENA CELOWO POMINIĘTA — dokument techniczny dla pracowników.
-     Ceny i marże widoczne wyłącznie w systemie ERP dla Biuro/Dyrektor. -->
-
-<!-- ═══ OPERACJE DO WYKONANIA ═══════════════════════════════════ -->
-{% if sop_template and sop_template.operations_json %}
-<div class="section">
-  <div class="section-title">2. Operacje do wykonania</div>
-  <table class="ops-table">
-    <thead>
-      <tr>
-        <th style="width:30px">#</th>
-        <th>Operacja</th>
-        <th style="width:80px">Czas (h)</th>
-        <th>Maszyna</th>
-        <th>Osoba odpowiedzialna</th>
-        <th style="width:60px">Status</th>
-      </tr>
-    </thead>
-    <tbody>
-      {% for op in sop_template.operations_json %}
-      <tr>
-        <td style="text-align:center">{{ loop.index }}</td>
-        <td><strong>{{ op.op }}</strong></td>
-        <td style="text-align:center">{{ op.hours or '—' }}</td>
-        <td>
-          {% if sop_template.machines_json %}
-            {% for m in sop_template.machines_json %}
-              {% if m.required %}<span style="font-size:8pt">{{ m.machine }}</span><br>{% endif %}
-            {% endfor %}
-          {% else %}—{% endif %}
-        </td>
-        <td>{{ op.responsible or '—' }}</td>
-        <td style="text-align:center">☐</td>
-      </tr>
-      {% endfor %}
-    </tbody>
-  </table>
+{% if order.requires_visit %}
+<div class="visit-alert">
+  📍 UWAGA: Zlecenie wymaga wizyty u klienta przed realizacją
 </div>
 {% endif %}
 
-<!-- ═══ INSTRUKCJA SOP ══════════════════════════════════════════ -->
+<!-- ═══ DANE ZLECENIA ════════════════════════════════════════ -->
+<div class="section">
+  <div class="section-header">
+    <span>1. Dane Zlecenia</span>
+    <span class="badge">
+      {% if order.order_type == 'remont' %}Remont / Naprawa
+      {% elif order.order_type == 'nowa_czesc' %}Nowa część / Projekt
+      {% elif order.order_type == 'catalog' %}Produkt katalogowy
+      {% else %}—{% endif %}
+    </span>
+  </div>
+  <div class="section-body">
+    <table class="data-table">
+      <tr>
+        <td class="lbl">Klient:</td>
+        <td class="val">{{ order.client }}</td>
+        <td class="lbl" style="padding-left:24px">Termin:</td>
+        <td class="val" style="color:{% if order.deadline %}#c62828{% else %}#888{% endif %}">
+          {{ order.deadline.strftime('%d.%m.%Y') if order.deadline else '—' }}
+        </td>
+      </tr>
+      {% if order.material %}
+      <tr>
+        <td class="lbl">Materiał:</td>
+        <td class="val" colspan="3">{{ order.material }}</td>
+      </tr>
+      {% endif %}
+      {% if order.description %}
+      <tr>
+        <td class="lbl">Opis zlecenia:</td>
+        <td class="val" colspan="3">{{ order.description }}</td>
+      </tr>
+      {% endif %}
+      {% if order.sop_name %}
+      <tr>
+        <td class="lbl">SOP / Szablon:</td>
+        <td class="val" colspan="3">{{ order.sop_name }}</td>
+      </tr>
+      {% endif %}
+      {% if order.quantity and order.quantity > 1 %}
+      <tr>
+        <td class="lbl">Ilość:</td>
+        <td class="val" colspan="3">{{ order.quantity }} szt.</td>
+      </tr>
+      {% endif %}
+      {% if order.notes %}
+      <tr>
+        <td class="lbl">Uwagi specjalne:</td>
+        <td class="val" colspan="3" style="color:#c62828">{{ order.notes }}</td>
+      </tr>
+      {% endif %}
+    </table>
+  </div>
+</div>
+
+<!-- ═══ OPERACJE ═════════════════════════════════════════════ -->
+{% if operations or (sop_template and sop_template.operations_json) %}
+<div class="section">
+  <div class="section-header">
+    <span>2. Plan Operacji</span>
+    {% set op_list = operations if operations else sop_template.operations_json %}
+    <span class="badge">{{ op_list | length }} operacji</span>
+  </div>
+  <div class="section-body" style="padding:0">
+    <table class="ops-table">
+      <thead>
+        <tr>
+          <th class="col-nr">#</th>
+          <th>Operacja / Czynność</th>
+          <th class="col-hrs">Czas (h)</th>
+          <th class="col-rate">Maszyna / Operator</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% if operations %}
+          {% for op in operations %}
+          <tr>
+            <td class="col-nr">{{ loop.index }}</td>
+            <td class="op-name">{{ op.name }}</td>
+            <td class="col-hrs">
+              {% if op.hours and op.hours > 0 %}
+              <span class="hrs-badge">{{ op.hours }}h</span>
+              {% else %}—{% endif %}
+            </td>
+            <td class="col-rate">—</td>
+          </tr>
+          {% endfor %}
+        {% elif sop_template and sop_template.operations_json %}
+          {% for op in sop_template.operations_json %}
+          <tr>
+            <td class="col-nr">{{ loop.index }}</td>
+            <td class="op-name">{{ op.op or op.name or '—' }}</td>
+            <td class="col-hrs">
+              {% if op.hours %}
+              <span class="hrs-badge">{{ op.hours }}h</span>
+              {% else %}—{% endif %}
+            </td>
+            <td class="col-rate">{{ op.responsible or '—' }}</td>
+          </tr>
+          {% endfor %}
+        {% endif %}
+      </tbody>
+    </table>
+  </div>
+</div>
+{% endif %}
+
+<!-- ═══ MATERIAŁY / MASY ══════════════════════════════════════ -->
+{% if quote and (quote.material_weight_kg or quote.weight_netto_kg or quote.weight_brutto_kg) %}
+<div class="section">
+  <div class="section-header"><span>3. Materiały i Masy</span></div>
+  <div class="section-body">
+    <table class="data-table">
+      {% if quote.material_weight_kg and quote.material_weight_kg > 0 %}
+      <tr>
+        <td class="lbl">Masa surowca:</td>
+        <td class="val">{{ quote.material_weight_kg }} kg</td>
+        <td class="lbl" style="padding-left:24px">Materiał:</td>
+        <td class="val">{{ order.material or '—' }}</td>
+      </tr>
+      {% endif %}
+      {% if quote.weight_netto_kg and quote.weight_netto_kg > 0 %}
+      <tr>
+        <td class="lbl">Masa netto wyrobu:</td>
+        <td class="val">{{ quote.weight_netto_kg }} kg</td>
+        <td class="lbl" style="padding-left:24px">Masa brutto (z opak.):</td>
+        <td class="val">{{ quote.weight_brutto_kg or '—' }} kg</td>
+      </tr>
+      {% endif %}
+    </table>
+  </div>
+</div>
+{% elif sop_template and sop_template.materials_json %}
+<div class="section">
+  <div class="section-header"><span>3. Zapotrzebowanie Materiałowe</span></div>
+  <div class="section-body" style="padding:0">
+    <table class="mat-table">
+      <thead>
+        <tr>
+          <th>#</th>
+          <th>Materiał</th>
+          <th>Ilość</th>
+          <th>Jednostka</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for mat in sop_template.materials_json %}
+        <tr>
+          <td style="width:28px;text-align:center;color:#888">{{ loop.index }}</td>
+          <td style="font-weight:600">{{ mat.mat or '—' }}</td>
+          <td>
+            {% if order.order_type == 'catalog' and order.quantity %}
+              {{ ((mat.qty_kg or mat.qty or 1) * order.quantity) | round(2) }}
+            {% else %}
+              {{ mat.qty_kg or mat.qty or '—' }}
+            {% endif %}
+          </td>
+          <td style="color:#888">{{ mat.unit or 'kg' }}</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+{% endif %}
+
+<!-- ═══ INSTRUKCJA SOP ════════════════════════════════════════ -->
 {% if sop_template and sop_template.instruction_blocks %}
 <div class="section">
-  <div class="section-title">3. Instrukcja wykonania (SOP)</div>
-  <ul class="sop-list">
+  <div class="section-header"><span>4. Instrukcja SOP</span></div>
+  <div class="section-body">
     {% for block in sop_template.instruction_blocks %}
-    <li>
-      <span class="sop-num">{{ block.order or loop.index }}</span>
-      <span>{{ block.text }}</span>
-    </li>
+    <div style="margin-bottom:8px;display:flex;gap:10px;align-items:flex-start">
+      <div style="width:22px;height:22px;background:#1a3a5c;color:#fff;font-size:8pt;font-weight:700;border-radius:50%;display:flex;align-items:center;justify-content:center;flex-shrink:0">
+        {{ block.order or loop.index }}
+      </div>
+      <div style="font-size:9pt;line-height:1.5;padding-top:2px">{{ block.text }}</div>
+    </div>
     {% endfor %}
-  </ul>
+  </div>
 </div>
 {% endif %}
 
-<!-- ═══ ZAPOTRZEBOWANIE MATERIAŁOWE ════════════════════════════ -->
-{% if sop_template and sop_template.materials_json %}
+<!-- ═══ KARTA KONTROLNA ══════════════════════════════════════ -->
 <div class="section">
-  <div class="section-title">4. Zapotrzebowanie materiałowe</div>
-  <table class="ops-table">
-    <thead>
-      <tr>
-        <th>#</th>
-        <th>Materiał</th>
-        <th>Ilość</th>
-        <th>Jednostka</th>
-        <th style="width:80px">Wydano ☐</th>
-      </tr>
-    </thead>
-    <tbody>
-      {% for mat in sop_template.materials_json %}
-      <tr>
-        <td style="text-align:center">{{ loop.index }}</td>
-        <td>{{ mat.mat }}</td>
-        <td style="text-align:center">
-          {% if order.quantity and order.order_type == 'catalog' %}
-            {{ (mat.qty_kg or mat.qty or 1) * order.quantity }}
-          {% else %}
-            {{ mat.qty_kg or mat.qty or '—' }}
-          {% endif %}
-        </td>
-        <td>{{ mat.unit or 'kg' }}</td>
-        <td style="text-align:center">☐</td>
-      </tr>
-      {% endfor %}
-    </tbody>
-  </table>
-</div>
-{% endif %}
+  <div class="section-header"><span>{{ 'Karta Kontrolna Jakości (po każdym etapie)' }}</span></div>
+  <div class="section-body">
+    <div class="qc-grid">
+      <div class="qc-item">
+        <div class="qc-box"></div>
+        <div class="qc-label">
+          <strong>Sprawdzenie wymiarów liniowych</strong>
+          <span>Suwmiarka, taśma miernicza</span>
+        </div>
+      </div>
+      <div class="qc-item">
+        <div class="qc-box"></div>
+        <div class="qc-label">
+          <strong>Sprawdzenie geometrii</strong>
+          <span>Kątownik, poziomica</span>
+        </div>
+      </div>
+      <div class="qc-item">
+        <div class="qc-box"></div>
+        <div class="qc-label">
+          <strong>Sprawdzenie jakości spawów</strong>
+          <span>Wizualnie + próba szczelności</span>
+        </div>
+      </div>
+      <div class="qc-item">
+        <div class="qc-box"></div>
+        <div class="qc-label">
+          <strong>Sprawdzenie powierzchni</strong>
+          <span>Lakier, powłoka, chropowatość</span>
+        </div>
+      </div>
+      <div class="qc-item">
+        <div class="qc-box"></div>
+        <div class="qc-label">
+          <strong>Kompletność elementów</strong>
+          <span>Śruby, nakrętki, akcesoria</span>
+        </div>
+      </div>
+      <div class="qc-item">
+        <div class="qc-box"></div>
+        <div class="qc-label">
+          <strong>Gotowe do wydania</strong>
+          <span>Ostateczna akceptacja</span>
+        </div>
+      </div>
+    </div>
 
-<!-- ═══ KARTA KONTROLNA WYROBU ══════════════════════════════════ -->
-<div class="section">
-  <div class="section-title">5. Karta Kontrolna Wyrobu (po każdym etapie)</div>
-  <div class="check-grid">
-    <div class="check-item">
-      <span class="checkbox"></span>
-      <span>Sprawdzenie wymiarów liniowych</span>
-    </div>
-    <div class="check-item">
-      <span class="checkbox"></span>
-      <span>Sprawdzenie wymiarów geometrycznych</span>
-    </div>
-    <div class="check-item">
-      <span class="checkbox"></span>
-      <span>Sprawdzenie wymogów powierzchni</span>
-    </div>
-    <div class="check-item" style="background:#fff8e1">
-      <span class="checkbox" style="border-color:#e65100"></span>
-      <span style="color:#e65100;font-weight:700">Kontrola końcowa — WYROBY</span>
+    <div class="sigs-grid" style="margin-top:16px">
+      <div class="sig-box">
+        <div class="sig-line"></div>
+        <div class="sig-label">Wykonał</div>
+        <div class="sig-date">Data: ___________</div>
+      </div>
+      <div class="sig-box">
+        <div class="sig-line"></div>
+        <div class="sig-label">Kontrola jakości</div>
+        <div class="sig-date">Data: ___________</div>
+      </div>
+      <div class="sig-box">
+        <div class="sig-line"></div>
+        <div class="sig-label">Zatwierdził (Kierownik)</div>
+        <div class="sig-date">Data: ___________</div>
+      </div>
     </div>
   </div>
 </div>
 
-<!-- ═══ PODPISY ═════════════════════════════════════════════════ -->
-<div class="signatures">
-  <div class="signature-box">Wystawił (Biuro)<br><br>___________________<br>Data: ____________</div>
-  <div class="signature-box">Zatwierdził (Technolog)<br><br>___________________<br>Data: ____________</div>
-  <div class="signature-box">Kontrola jakości<br><br>___________________<br>Data: ____________</div>
-</div>
-
-<!-- ═══ STOPKA ══════════════════════════════════════════════════ -->
+<!-- ═══ STOPKA ═══════════════════════════════════════════════ -->
 <div class="footer">
   <span>RCM Sp. z o.o. | ul. Graniczna 3, 19-500 Gołdap</span>
-  <span>Arkusz wygenerowany automatycznie przez RCM ERP | {{ today }}</span>
-  <span>Nr: {{ order.order_number or order.id }}</span>
+  <span>{{ order.order_number or order.id }} | Wydruk: {{ today }}</span>
 </div>
 
 </body>

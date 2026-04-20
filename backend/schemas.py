@@ -103,26 +103,33 @@ class QuoteCreate(BaseModel):
 
 
 class ProcessItem(BaseModel):
-    """Pojedynczy proces w strukturalnej wycenie technologa."""
-    name: str
-    cost: float
+    """Operacja produkcyjna v3: hours × rate_per_hour. Legacy: cost bezpośredni."""
+    name:          str
+    hours:         float = 0
+    rate_per_hour: float = 0
+    cost:          float = 0  # legacy fallback gdy hours/rate nieznane
 
 
 class QuoteStructuredCreate(BaseModel):
     """
-    Strukturalna wycena wg formuły technologa.
-    Priorytety: procesy → materiał → waga × stawka → czas spawania → robocizna.
+    Strukturalna wycena v3 (cleaner formula).
+    Materiał: material_weight_kg × material_price_per_kg.
+    Operacje: sum(hours × rate_per_hour), fallback na cost.
     """
-    processes:          List[ProcessItem] = Field(default_factory=list)
-    material_cost:      float = 0
-    weight_kg:          float = 0
-    weight_rate_pln_kg: float = 15    # 7–30 PLN/kg zależnie od złożoności projektu
-    welding_hours:      float = 0
-    weight_netto_kg:    float = 0     # informacyjnie
-    weight_brutto_kg:   float = 0     # informacyjnie
-    overhead_pct:       float = 0.10
-    margin_pct:         float = 0.25
-    labor_hours:        float = 0     # opcjonalna dodatkowa robocizna poza spawaniem
+    processes:             List[ProcessItem] = Field(default_factory=list)
+    material_weight_kg:    float = 0   # kg surowca (np. 50 kg S235)
+    material_price_per_kg: float = 0   # PLN/kg surowca (np. 3.50)
+    material_cost:         float = 0   # legacy: całkowity koszt materiału
+    weight_netto_kg:       float = 0
+    weight_brutto_kg:      float = 0
+    labor_hours:           float = 0   # dodatkowa robocizna (montaż, wykończenie)
+    overhead_pct:          float = 0.10
+    margin_pct:            float = 0.25
+    transport_cost:        float = 0
+    show_unit_prices:      bool  = True
+    # Stare pola — backward compat
+    weight_kg:             float = 0
+    weight_rate_pln_kg:    float = 0
 
 
 class QuoteZaporCreate(BaseModel):
@@ -143,7 +150,7 @@ class QuoteOut(BaseModel):
     margin_pct:    Optional[float]
     is_zapor:      bool
     created_at:    datetime
-    # Pola v2 — None dla starych wycen
+    # v2 pola
     processes_json:     Optional[List[Any]] = None
     weight_kg:          Optional[float]     = None
     weight_rate_pln_kg: Optional[float]     = None
@@ -151,6 +158,12 @@ class QuoteOut(BaseModel):
     weight_netto_kg:    Optional[float]     = None
     weight_brutto_kg:   Optional[float]     = None
     estimate_version:   Optional[str]       = None
+    last_edited_at:     Optional[datetime]  = None
+    transport_cost:     Optional[float]     = None
+    # v3 pola
+    material_weight_kg:    Optional[float] = None
+    material_price_per_kg: Optional[float] = None
+    show_unit_prices:      bool             = True
     model_config = {"from_attributes": True}
 
 
@@ -298,3 +311,46 @@ class AnalyticsSummary(BaseModel):
     revenue_by_month: List[RevenueMonth] = []
     top_clients:      List[TopClient] = []
     overdue_orders:   List[OverdueOrder] = []
+
+
+# =============================================================================
+# APPROVED MATERIALS — Whitelist materiałów
+# =============================================================================
+class ApprovedMaterialCreate(BaseModel):
+    name:                str
+    category:            Optional[str]   = None
+    default_rate_pln_kg: Optional[float] = None
+    is_active:           bool            = True
+    notes:               Optional[str]   = None
+
+
+class ApprovedMaterialOut(BaseModel):
+    id:                  int
+    name:                str
+    category:            Optional[str]   = None
+    default_rate_pln_kg: Optional[float] = None
+    is_active:           bool
+    notes:               Optional[str]   = None
+    model_config = {"from_attributes": True}
+
+
+# =============================================================================
+# BENCHMARK — Analiza cen historycznych (benchmark/cena za kg)
+# =============================================================================
+class BenchmarkSample(BaseModel):
+    """Pojedyncza próbka z historii cen."""
+    order_id:    int
+    date:        date
+    weight_kg:   float
+    total_net:   float
+    pln_kg:      float
+
+
+class BenchmarkOut(BaseModel):
+    """Benchmark ceny za kg — agregacja historycznych zleceń."""
+    avg_pln_kg:  float
+    min_pln_kg:  float
+    max_pln_kg:  float
+    count:       int
+    warning:     Optional[str] = None  # "Недостаточно данных" jeśli < 3 próbek
+    samples:     List[BenchmarkSample]

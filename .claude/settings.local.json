@@ -1,0 +1,28 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(git -C D:/vsc/f/rcm_erp_new log --oneline -8)",
+      "Read(//d/vsc/f/rcm_erp_new/**)",
+      "Bash(set PYTHONIOENCODING=utf-8)",
+      "Bash(python -c \"from models import *; from schemas import *; print\\('Models OK'\\); from main import app; print\\('Main OK'\\)\")",
+      "Bash(python -c ':*)",
+      "Bash(python -X utf8 seed.py)",
+      "WebFetch(domain:github.com)",
+      "WebSearch",
+      "Bash(curl -s https://raw.githubusercontent.com/obra/superpowers/main/README.md)",
+      "Bash(curl -s https://raw.githubusercontent.com/affaan-m/everything-claude-code/main/README.md)",
+      "Bash(curl -s https://raw.githubusercontent.com/mindfold-ai/Trellis/main/README.md)",
+      "Bash(curl -s https://raw.githubusercontent.com/midudev/autoskills/main/README.md)",
+      "Bash(python3 -c \"import sys,json; data=json.load\\(sys.stdin\\); [print\\(r['full_name'], r['html_url']\\) for r in data.get\\('items',[]\\)[:5]]\")",
+      "Bash(python3 -c \"import sys,json; data=json.load\\(sys.stdin\\); [print\\(r['full_name'], '-', r['description']\\) for r in data.get\\('items',[]\\)[:5]]\")",
+      "Bash(python3 -c \"import sys,json; data=json.load\\(sys.stdin\\); print\\(data.get\\('total_count'\\), 'results'\\)\")",
+      "Bash(python3 -c \"import sys,json; data=json.load\\(sys.stdin\\); [print\\(r['full_name'], r['stargazers_count'], '-', r.get\\('description',''\\)\\) for r in data.get\\('items',[]\\)[:8]]\")",
+      "Bash(npx autoskills *)",
+      "Read(//c/Users/Fidaczjo/.claude/**)",
+      "Bash(curl -s \"https://raw.githubusercontent.com/affaan-m/everything-claude-code/main/README.md\")",
+      "Bash(curl -s \"https://raw.githubusercontent.com/mindfold-ai/Trellis/main/README.md\")",
+      "Bash(python3 -c \"import json,sys; d=json.load\\(sys.stdin\\); print\\(json.dumps\\(d, indent=2\\)\\)\")",
+      "Bash(python -m pytest tests/ -v --tb=short)"
+    ]
+  }
+}

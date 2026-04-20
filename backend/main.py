@@ -25,7 +25,7 @@ from models import (
     Base, Order, OrderOperation, Quote, MaterialRequest,
     QualityCard, ProductTemplate, ConstraintRule, PriceHistory,
     ParameterRequest, StockMovement, ComponentContainer,
-    Setting, OrderStatus, TriageBranch, OrderAttachment, init_db
+    Setting, OrderStatus, TriageBranch, OrderAttachment, ApprovedMaterial, init_db
 )
 from schemas import (
     OrderCreate, OrderOut, OrderUpdate, TriageResponse,
@@ -37,6 +37,8 @@ from schemas import (
     ParameterRequestCreate, ParameterRequestAnswer, ParameterRequestOut,
     TemplateCreate, TemplateOut,
     AnalyticsSummary, RevenueMonth, TopClient, OverdueOrder,
+    ApprovedMaterialCreate, ApprovedMaterialOut,
+    BenchmarkOut, BenchmarkSample,
 )
 from triage import run_triage, TriageInput
 
@@ -61,7 +63,12 @@ def _ensure_quote_v2_columns(eng) -> None:
         ("welding_hours",      "REAL DEFAULT 0"),
         ("weight_netto_kg",    "REAL DEFAULT 0"),
         ("weight_brutto_kg",   "REAL DEFAULT 0"),
-        ("estimate_version",   "TEXT DEFAULT 'v1'"),
+        ("estimate_version",      "TEXT DEFAULT 'v1'"),
+        ("last_edited_at",        "TIMESTAMP"),
+        ("transport_cost",        "REAL DEFAULT 0"),
+        ("material_weight_kg",    "REAL DEFAULT 0"),
+        ("material_price_per_kg", "REAL DEFAULT 0"),
+        ("show_unit_prices",      "BOOLEAN DEFAULT 1"),
     ]
     # Kolumny dodane do tabeli orders po pierwszym deploymencie
     order_cols = [
@@ -86,6 +93,25 @@ def _ensure_quote_v2_columns(eng) -> None:
         conn.commit()
 
 _ensure_quote_v2_columns(engine)
+
+
+def _ensure_approved_materials_table(eng) -> None:
+    """Idempotentne tworzenie tabeli approved_materials."""
+    with eng.connect() as conn:
+        conn.execute(text("""
+            CREATE TABLE IF NOT EXISTS approved_materials (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                name TEXT UNIQUE NOT NULL,
+                category TEXT,
+                default_rate_pln_kg REAL,
+                is_active INTEGER NOT NULL DEFAULT 1,
+                notes TEXT
+            )
+        """))
+        conn.commit()
+
+
+_ensure_approved_materials_table(engine)
 
 # ─── Katalog dla załączników ──────────────────────────────────────────────────
 UPLOAD_ROOT = pathlib.Path(__file__).parent / "uploads"
@@ -359,16 +385,37 @@ def create_structured_quote(
     if not order:
         raise HTTPException(status_code=404, detail="Zlecenie nie znalezione")
 
+    # Wycenę można utworzyć z niestandard lub edytować w quoted/in_production.
+    # Statusy gotowe/wydane/rejected — blokujemy (zamknięte zlecenia).
+    editable_statuses = {
+        OrderStatus.niestandard,
+        OrderStatus.quoted,
+        OrderStatus.in_production,
+    }
+    if order.status not in editable_statuses:
+        raise HTTPException(
+            status_code=409,
+            detail=f"Wycena niedozwolona w statusie '{order.status.value}'",
+        )
+
     rate_setting = db.get(Setting, "labor_rate_pln")
     labor_rate   = float(rate_setting.value) if rate_setting else 90.0
 
-    proc_total    = sum(p.cost for p in payload.processes)
-    weight_total  = payload.weight_kg * payload.weight_rate_pln_kg
-    welding_total = payload.welding_hours * labor_rate
-    extra_labor   = payload.labor_hours * labor_rate
-    base          = proc_total + payload.material_cost + weight_total + welding_total + extra_labor
-    subtotal      = base * (1 + payload.overhead_pct)
-    total_net     = subtotal * (1 + payload.margin_pct)
+    # Formuła v3: operacje z hours×rate (fallback: cost), materiał kg×PLN/kg (fallback: material_cost)
+    ops_total = sum(
+        p.hours * p.rate_per_hour if (p.hours and p.rate_per_hour) else (p.cost or 0)
+        for p in payload.processes
+    )
+    material_total = (
+        payload.material_weight_kg * payload.material_price_per_kg
+        if payload.material_price_per_kg > 0
+        else payload.material_cost
+    )
+    extra_labor = payload.labor_hours * labor_rate
+    base        = ops_total + material_total + extra_labor
+    subtotal    = base * (1 + payload.overhead_pct)
+    # Transport doliczamy PO marży — passthrough bez narzutu
+    total_net   = subtotal * (1 + payload.margin_pct) + (payload.transport_cost or 0)
 
     # Upsert — jeden Quote na zlecenie (zastępuje poprzednią wycenę)
     quote = db.query(Quote).filter(Quote.order_id == order_id).first()
@@ -376,22 +423,24 @@ def create_structured_quote(
         quote = Quote(order_id=order_id)
         db.add(quote)
 
-    quote.line_items         = []
-    quote.processes_json     = [p.model_dump() for p in payload.processes]
-    quote.material_cost      = payload.material_cost
-    quote.weight_kg          = payload.weight_kg
-    quote.weight_rate_pln_kg = payload.weight_rate_pln_kg
-    quote.welding_hours      = payload.welding_hours
-    quote.weight_netto_kg    = payload.weight_netto_kg
-    quote.weight_brutto_kg   = payload.weight_brutto_kg
-    quote.labor_hours        = payload.labor_hours + payload.welding_hours
-    quote.overhead_pct       = payload.overhead_pct
-    quote.margin_pct         = payload.margin_pct
-    quote.total_net          = round(total_net, 2)
-    quote.is_zapor           = False
-    quote.estimate_version   = "v2"
+    quote.line_items              = []
+    quote.processes_json          = [p.model_dump() for p in payload.processes]
+    quote.material_cost           = material_total
+    quote.material_weight_kg      = payload.material_weight_kg
+    quote.material_price_per_kg   = payload.material_price_per_kg
+    quote.weight_netto_kg         = payload.weight_netto_kg
+    quote.weight_brutto_kg        = payload.weight_brutto_kg
+    quote.labor_hours             = payload.labor_hours
+    quote.overhead_pct            = payload.overhead_pct
+    quote.margin_pct              = payload.margin_pct
+    quote.transport_cost          = payload.transport_cost or 0
+    quote.show_unit_prices        = payload.show_unit_prices
+    quote.total_net               = round(total_net, 2)
+    quote.is_zapor                = False
+    quote.estimate_version        = "v3"
+    quote.last_edited_at          = _now()
 
-    # Zlecenie niestandard → quoted
+    # Pierwsza wycena: niestandard → quoted. Edycja w quoted/in_production — status bez zmian.
     if order.status == OrderStatus.niestandard:
         order.status = OrderStatus.quoted
 
@@ -408,6 +457,23 @@ def confirm_order(order_id: int, db: Session = Depends(get_db)):
         raise HTTPException(status_code=404, detail="Zlecenie nie znalezione")
     if order.status != OrderStatus.quoted:
         raise HTTPException(status_code=409, detail="Tylko zlecenia w statusie 'quoted' można zatwierdzić")
+
+    # Zapisz snapshot wyceny do historii cen (benchmark)
+    quote = db.query(Quote).filter(Quote.order_id == order_id).first()
+    if quote and quote.total_net:
+        # Odczytaj wagę: material_weight_kg lub weight_kg (dla kompatybilności)
+        weight_kg = float(quote.material_weight_kg or quote.weight_kg or 0)
+        if weight_kg > 0:
+            pln_kg = float(quote.total_net) / weight_kg
+            price_rec = PriceHistory(
+                order_type=order.sop_name or order.order_type,
+                total_price_historical=quote.total_net,
+                parameters_json={"weight_kg": weight_kg, "pln_kg": pln_kg, "material": order.material},
+                order_date=date.today(),
+                client=order.client,
+            )
+            db.add(price_rec)
+
     order.status = OrderStatus.in_production
     db.commit()
     db.refresh(order)
@@ -838,7 +904,7 @@ def export_xlsx(db: Session = Depends(get_db)):
         ws.cell(row=row_idx, column=3, value=o.status.value if o.status else "")
         ws.cell(row=row_idx, column=4, value=o.triage_branch or "")
         ws.cell(row=row_idx, column=5, value=o.deadline.isoformat() if o.deadline else "")
-        ws.cell(row=row_idx, column=6, value=float(quote.total_price_net) if quote and quote.total_price_net else 0)
+        ws.cell(row=row_idx, column=6, value=float(quote.total_net) if quote and quote.total_net else 0)
         ws.cell(row=row_idx, column=7, value=o.created_at.strftime("%Y-%m-%d") if o.created_at else "")
 
     # Szerokości kolumn
@@ -903,6 +969,112 @@ def update_setting(key: str, payload: dict, db: Session = Depends(get_db)):
     setting.value = str(payload.get("value", setting.value))
     db.commit()
     return {"key": key, "value": setting.value}
+
+
+# =============================================================================
+# APPROVED MATERIALS — Whitelist materiałów (CRUD)
+# =============================================================================
+
+@app.get("/api/approved-materials", response_model=List[ApprovedMaterialOut])
+def list_approved_materials(db: Session = Depends(get_db)):
+    return db.query(ApprovedMaterial).filter(ApprovedMaterial.is_active == True).order_by(ApprovedMaterial.name).all()
+
+
+@app.post("/api/approved-materials", response_model=ApprovedMaterialOut, status_code=201)
+def create_approved_material(payload: ApprovedMaterialCreate, db: Session = Depends(get_db)):
+    if db.query(ApprovedMaterial).filter(ApprovedMaterial.name == payload.name).first():
+        raise HTTPException(status_code=409, detail=f"Materiał '{payload.name}' już istnieje")
+    mat = ApprovedMaterial(**payload.model_dump())
+    db.add(mat)
+    db.commit()
+    db.refresh(mat)
+    return mat
+
+
+@app.patch("/api/approved-materials/{mat_id}", response_model=ApprovedMaterialOut)
+def update_approved_material(mat_id: int, payload: dict, db: Session = Depends(get_db)):
+    mat = db.get(ApprovedMaterial, mat_id)
+    if not mat:
+        raise HTTPException(status_code=404, detail="Materiał nie znaleziony")
+    for k, v in payload.items():
+        if hasattr(mat, k):
+            setattr(mat, k, v)
+    db.commit()
+    db.refresh(mat)
+    return mat
+
+
+@app.delete("/api/approved-materials/{mat_id}", status_code=204)
+def delete_approved_material(mat_id: int, db: Session = Depends(get_db)):
+    mat = db.get(ApprovedMaterial, mat_id)
+    if not mat:
+        raise HTTPException(status_code=404, detail="Materiał nie znaleziony")
+    mat.is_active = False  # soft delete
+    db.commit()
+
+
+# =============================================================================
+# BENCHMARK — Analiza cen historycznych (cena za kg)
+# =============================================================================
+
+@app.get("/api/benchmarks/price-per-kg", response_model=BenchmarkOut)
+def get_price_per_kg_benchmark(material: str, order_type: Optional[str] = None, db: Session = Depends(get_db)):
+    """
+    Zwraca benchmark ceny za kg dla materiału (opcjonalnie filtrując po typie zlecenia).
+    Agreguje PriceHistory i Quote records.
+    Jeśli < 3 próbek → warning.
+    """
+    # Szukaj w PriceHistory
+    query = db.query(PriceHistory)
+    if material:
+        # parameters_json zawiera {"material": "..."}
+        query = query.filter(
+            func.json_extract(PriceHistory.parameters_json, '$.material').ilike(f"%{material}%")
+        )
+    if order_type:
+        query = query.filter(PriceHistory.order_type.ilike(f"%{order_type}%"))
+
+    records = query.all()
+    samples = []
+    for rec in records:
+        params = rec.parameters_json or {}
+        if isinstance(params, str):
+            import json
+            params = json.loads(params)
+        weight = params.get("weight_kg", 0)
+        pln_kg = params.get("pln_kg", 0)
+        if weight and pln_kg:
+            samples.append(BenchmarkSample(
+                order_id=0,  # PriceHistory nie ma order_id
+                date=rec.order_date or date.today(),
+                weight_kg=weight,
+                total_net=float(rec.total_price_historical or 0),
+                pln_kg=pln_kg,
+            ))
+
+    warning = None
+    if len(samples) < 3:
+        warning = "Недостаточно данных — potrzeba minimum 3 próbek dla wiarygodnego benchmarku"
+
+    if not samples:
+        return BenchmarkOut(
+            avg_pln_kg=0.0,
+            min_pln_kg=0.0,
+            max_pln_kg=0.0,
+            count=0,
+            warning=warning or "Brak danych",
+            samples=[],
+        )
+
+    pln_kg_values = [s.pln_kg for s in samples]
+    return BenchmarkOut(
+        avg_pln_kg=sum(pln_kg_values) / len(pln_kg_values),
+        min_pln_kg=min(pln_kg_values),
+        max_pln_kg=max(pln_kg_values),
+        count=len(samples),
+        warning=warning,
+        samples=samples,
+    )
 
 
 # =============================================================================
